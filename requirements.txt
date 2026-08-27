@@ -1,0 +1,19 @@
+# yfinance: I Google Colab (nu det anbefalede kørselsmiljø, se README.md) er
+# der ingen installationsbegrænsninger — brug nyeste version, den håndterer
+# Yahoos anti-bot-blokering bedre:
+#   pip install -q -U yfinance pandas numpy
+# Kører du derimod on-device på iOS (fx a-Shell, uden kompiler til rådighed),
+# så pin i stedet til 0.2.55 — verificeret på PyPI at denne (og 0.2.54-0.2.56)
+# KUN kræver rene Python-pakker (ingen curl_cffi, ingen lxml):
+#   yfinance==0.2.55
+yfinance
+pandas>=2.0
+numpy>=1.24
+requests>=2.28          # StockTwits-opslag (screener.py) — ren Python, ingen kompiler
+streamlit>=1.30         # "Mine Aktier" GUI-app (app.py) — kun nødvendig hvis du deployer appen
+
+# Valgfrit — kun nødvendigt for Reddit-delen af kandidat-screeneren.
+# Rent Python (ingen kompilerede afhængigheder), men Reddit-sentiment
+# udelades automatisk (uden fejl) hvis den ikke er installeret eller
+# API-nøgler ikke er sat op — se README.md "Kandidat-screener".
+praw>=7.7
