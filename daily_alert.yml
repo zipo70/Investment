@@ -1,0 +1,36 @@
+name: Dagligt køb/sælg-tjek
+
+# Kører alert_check.py automatisk hver hverdag — helt uafhængigt af om
+# "Mine Aktier"-appen er åben på telefonen. Se README.md, afsnittet
+# "Automatisk dagligt tjek" for opsætning af secrets (NTFY_TOPIC eller
+# Twilio-nøglerne).
+
+on:
+  schedule:
+    # 06:00 UTC = kl. 08:00 dansk sommertid / kl. 07:00 dansk vintertid.
+    # Cron kører altid i UTC og tager IKKE selv højde for dansk sommertid —
+    # tidspunktet flytter sig derfor en time frem/tilbage ved skiftet.
+    - cron: "0 6 * * 1-5"
+  workflow_dispatch: {}   # gør det muligt at trykke "Run workflow" manuelt
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installér afhængigheder
+        run: pip install -r requirements.txt
+
+      - name: Kør dagligt køb/sælg-tjek
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_FROM_NUMBER: ${{ secrets.TWILIO_FROM_NUMBER }}
+          TWILIO_TO_NUMBER: ${{ secrets.TWILIO_TO_NUMBER }}
+        run: python alert_check.py

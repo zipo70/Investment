@@ -1,0 +1,15 @@
+# Tickere til det automatiske daglige KØB/SÆLG-tjek (alert_check.py).
+#
+# Én Yahoo Finance-ticker pr. linje, fx: AAPL, NOVO-B.CO, ASML.AS
+# Linjer der starter med '#' (som denne) ignoreres.
+#
+# Redigér denne fil direkte her på GitHub for at tilføje/fjerne aktier fra
+# det automatiske tjek. Den er adskilt fra "Mine Aktier"-appens egen
+# watchlist (som kun lever midlertidigt i selve appen).
+#
+# Top 10-kandidaterne bliver ALTID tjekket automatisk oveni denne liste,
+# så du behøver ikke tilføje dem selv.
+#
+# Eksempel (fjern '#' foran linjen for at aktivere):
+# NOVO-B.CO
+# GMAB.CO
