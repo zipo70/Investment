@@ -12,10 +12,13 @@ Funktioner:
   den rigtige Yahoo-ticker op).
 - Hvert kort viser: navn, seneste kurs, dagens ændring, en mini-graf
   (som "Værdipapirer"-appen), børs/land/valuta, og — efter analyse — en
-  komposit-rating (0-100), et upside-estimat og en KØB/HOLD/SÆLG-
-  anbefaling. Komposit-scoren vægter teknisk analyse (kort+lang bane,
-  30%), fundamentale nøgletal (25%) og popularitet/analytiker-tiltro
-  (45%, vægtet tungest) sammen.
+  komposit-rating (0-100), et upside-estimat (kun vist hvis der er rigtig
+  analytikerdækning — ingen misvisende teknisk gæt hvis ikke) og en
+  KØB/HOLD/SÆLG-anbefaling. Komposit-scoren vægter teknisk analyse
+  (kort+lang bane, 30%), fundamentale nøgletal (25%) og popularitet/
+  analytiker-tiltro (36%, vægtet tungest) og "Aktieguld"-point (20%, en
+  tilnærmet gengivelse af Jens Løgstrups bogmodel — se
+  core.py:get_aktieguld_data for detaljer og forbehold) sammen.
 - AI chat-fane: UI-skelettet er der, men svarene er statiske indtil en
   rigtig API-nøgle kobles på (bevidst fravalgt i første version — se
   README.md).
@@ -48,6 +51,86 @@ from core import (
 
 def _esc(s):
     return _htmllib.escape(str(s)) if s is not None else ""
+
+
+def _render_triggers(icon: str, label: str, items):
+    """Pænere visning af en triggerliste inde i en 'Detaljer'-undermenu —
+    rettet fra rå Python-listeudskrift (BACKLOG.md #4) til en rigtig
+    punktopstilling med en lille overskrift."""
+    st.markdown(f"**{icon} {label}**")
+    if items:
+        st.markdown("\n".join(f"- {item}" for item in items))
+    else:
+        st.caption("Ingen")
+
+
+def _render_aktieguld(aktieguld: dict):
+    """Viser Aktieguld-point (tilnærmet gengivelse af Løgstrup-modellen, se
+    core.py:get_aktieguld_data for de fulde forbehold) i samme sted som de
+    øvrige nøgletal-sektioner i 'Detaljer'/'Triggere'-undermenuen."""
+    st.markdown("**🏆 Aktieguld-point** *(tilnærmet — ikke bogens ordrette formel, se forbehold i README)*")
+    if not aktieguld or not aktieguld.get("ok"):
+        st.caption(f"Ingen data ({(aktieguld or {}).get('reason', 'ukendt årsag')})")
+        return
+    linjer = []
+    if aktieguld.get("fase1_score") is not None:
+        linjer.append(f"Fase 1 — Strategisk analyse: {aktieguld['fase1_score']:.0f}/100")
+    if aktieguld.get("fase2_score") is not None:
+        afkast = aktieguld.get("fase2_forventet_afkast_pct")
+        afkast_txt = f" (forventet afkast {afkast:+.1f}%)" if afkast is not None else ""
+        linjer.append(f"Fase 2 — Afkastberegning: {aktieguld['fase2_score']:.0f}/100{afkast_txt}")
+    if aktieguld.get("fase3_score") is not None:
+        linjer.append(f"Fase 3 — Kvalitetspoint: {aktieguld['fase3_score']:.0f}/100")
+    linjer.extend(aktieguld.get("aktieguld_triggers") or [])
+    st.markdown("\n".join(f"- {l}" for l in linjer) if linjer else "*Ingen delresultater*")
+    st.caption(f"Samlet Aktieguld-score: {aktieguld['aktieguld_score']:.0f}/100 (vægter 20% i komposit-scoren)")
+
+
+def _top10_technical_sort_key(c):
+    ta, lt = c["ta"], c.get("long_term", {})
+    if lt.get("ok"):
+        return 0.6 * ta["ta_score"] + 0.4 * lt["long_term_score"]
+    return ta["ta_score"]
+
+
+# Sorteringsmuligheder til Top 10-fanen (BACKLOG.md #5) — hver indgang er
+# (nøglefunktion, faldende_rækkefølge). Manglende data lægges sidst i en
+# faldende sortering (-inf) og sorteres normalt (a-å) for tekst-felter.
+TOP10_SORT_OPTIONS = {
+    "Komposit-score (høj → lav)": (lambda c: c["composite_score"], True),
+    "Upside % (høj → lav)": (lambda c: c["upside_pct"] if c["upside_pct"] is not None else float("-inf"), True),
+    "Teknisk score (høj → lav)": (_top10_technical_sort_key, True),
+    "Fundamental score (høj → lav)": (
+        lambda c: (c["fundamental"]["fundamental_score"]
+                   if c["fundamental"].get("ok") and c["fundamental"].get("fundamental_score") is not None
+                   else float("-inf")),
+        True,
+    ),
+    "Popularitet/analytiker-tiltro (høj → lav)": (
+        lambda c: c.get("popularity_score") if c.get("popularity_score") is not None else float("-inf"),
+        True,
+    ),
+    "Aktieguld-score (høj → lav)": (
+        lambda c: (c.get("aktieguld", {}).get("aktieguld_score")
+                   if c.get("aktieguld", {}).get("ok") and c.get("aktieguld", {}).get("aktieguld_score") is not None
+                   else float("-inf")),
+        True,
+    ),
+    "Region (A-Å)": (lambda c: c["region"], False),
+    "Ticker (A-Å)": (lambda c: c["ticker"], False),
+}
+
+
+def _upside_caveat_caption(upside_pct):
+    """Forklarer negativ upside, som IKKE indgår i komposit-scoren og derfor
+    sagtens kan optræde sammen med en høj rating (BACKLOG.md #6, valgt
+    løsning: forklar det tydeligt i UI'en frem for at ændre scoren)."""
+    if upside_pct is not None and upside_pct < 0:
+        st.caption(
+            "⚠️ Negativ upside betyder at kursen allerede ligger over analytikernes "
+            "gennemsnitlige kursmål — det er uafhængigt af komposit-scoren, som måler "
+            "momentum/kvalitet/popularitet, ikke hvor \"billig\" aktien er."
+        )
 
 
 # ============================================================================
@@ -216,29 +299,35 @@ with tab_watch:
                     rec = result.get("recommendation", {})
                     action = rec.get("action", "–")
                     action_cls = {"KØB": "rating-high", "HOLD": "rating-mid", "SÆLG": "rating-low"}.get(action, "rating-mid")
-                    upside_txt = f"{result['upside_pct']:+.1f}%" if result["upside_pct"] is not None else "–"
-                    st.markdown(
+                    badge_html = (
                         f'<span class="rating-badge {action_cls}">{_esc(action)}</span>&nbsp;'
-                        f'<span class="rating-badge {cls}">Rating: {score:.0f}/100</span>&nbsp;'
-                        f'<span class="stock-name">Upside: {upside_txt} ({result["upside_kilde"]})</span>',
-                        unsafe_allow_html=True,
+                        f'<span class="rating-badge {cls}">Rating: {score:.0f}/100</span>'
                     )
+                    if result["upside_pct"] is not None:
+                        # Vises kun ved rigtig analytikerdækning — se core.py:compute_upside
+                        badge_html += (
+                            f'&nbsp;<span class="stock-name">Upside: {result["upside_pct"]:+.1f}% '
+                            f'({result["upside_kilde"]})</span>'
+                        )
+                    st.markdown(badge_html, unsafe_allow_html=True)
+                    _upside_caveat_caption(result["upside_pct"])
                     with st.expander("Detaljer"):
                         if rec.get("sell_triggers"):
-                            st.write("Sælg-signaler:", rec["sell_triggers"])
-                        st.write("Tekniske triggere (kort bane):", result["ta"]["ta_triggers"] or "Ingen")
+                            _render_triggers("🔴", "Sælg-signaler", rec["sell_triggers"])
+                        _render_triggers("📈", "Tekniske triggere (kort bane)", result["ta"]["ta_triggers"])
                         lt = result.get("long_term", {})
                         if lt.get("ok"):
-                            st.write("Langsigtede triggere (lang bane):", lt["long_term_triggers"] or "Ingen")
+                            _render_triggers("📊", "Langsigtede triggere (lang bane)", lt["long_term_triggers"])
                         fa = result.get("fundamental", {})
                         if fa.get("ok") and fa.get("fundamental_triggers"):
-                            st.write("Fundamentale styrker:", fa["fundamental_triggers"])
+                            _render_triggers("💰", "Fundamentale styrker", fa["fundamental_triggers"])
                         elif fa.get("ok") is False:
                             st.caption(f"Fundamentale nøgletal: ingen data ({fa.get('reason', '?')})")
+                        _render_aktieguld(result.get("aktieguld", {}))
                         a = result["analyst"]
                         if a.get("ok") and a.get("recommendation_key"):
-                            st.write(f"Analytiker-anbefaling: {a['recommendation_key']} "
-                                     f"({a.get('num_analysts', '?')} analytikere)")
+                            st.markdown(f"**🎯 Analytiker-anbefaling:** {a['recommendation_key']} "
+                                        f"({a.get('num_analysts', '?')} analytikere)")
                         plan = result.get("plan", {})
                         if plan.get("stop_price") is not None:
                             st.caption(f"Stop-niveau: {plan['stop_price']:.2f} ({plan.get('stop_kilde', '?')})")
@@ -250,8 +339,10 @@ with tab_top10:
     st.caption(
         "Scanner det kuraterede aktieunivers (~93 aktier på tværs af USA, Europa, "
         "Norden og emerging markets — samme liste som kandidat-screeneren) og "
-        "rangerer efter teknisk (kort+lang bane, 30%), fundamental (25%) og "
-        "popularitet/analytiker-tiltro (45%) — populæritet vægtes tungest. "
+        "rangerer efter teknisk (kort+lang bane, 24%), fundamental (20%), "
+        "popularitet/analytiker-tiltro (36%) og \"Aktieguld\"-point (20%, en "
+        "tilnærmet gengivelse af Jens Løgstrups bogmodel — se Detaljer/Triggere "
+        "pr. aktie for forbehold) — populæritet vægtes tungest. "
         "Ikke 'alle aktier på Yahoo Finance' — det er ikke teknisk muligt at scanne "
         "uden at blive rate-limitet. Tager typisk 2-4 minutter; resultatet caches i "
         "30 minutter, så du ikke behøver vente hver gang. Top 10 tjekkes desuden "
@@ -283,8 +374,19 @@ with tab_top10:
             f"{scan_stats['skipped_trend']} bestod ikke trendfilteret · "
             f"{scan_stats['shortlist_size']} gik videre til analytiker-/sentiment-analyse."
         )
+        if scan_stats.get("high_skip_rate"):
+            st.warning(
+                f"⚠️ {scan_stats['skipped_data']} af {scan_stats['universe_size']} aktier kunne ikke "
+                "hentes i denne kørsel — det er usædvanligt mange, og tyder på midlertidig "
+                "rate-limitering fra Yahoo Finance snarere end at der reelt kun findes få gode "
+                "kandidater. Prøv evt. at køre scanningen igen om lidt."
+            )
         if not top_candidates:
             st.info("Ingen kandidater bestod trendfilteret i denne scanning.")
+        else:
+            sort_label = st.selectbox("Sortér efter", list(TOP10_SORT_OPTIONS.keys()), key="top10_sort")
+            key_fn, descending = TOP10_SORT_OPTIONS[sort_label]
+            top_candidates = sorted(top_candidates, key=key_fn, reverse=descending)
         for rank, c in enumerate(top_candidates, 1):
             ta, plan = c["ta"], c["plan"]
             with st.container():
@@ -307,8 +409,12 @@ with tab_top10:
                     st.markdown(f'<span class="stock-name">{" · ".join(meta_bits)}</span>',
                                 unsafe_allow_html=True)
 
-                upside_txt = f"{c['upside_pct']:+.1f}%" if c["upside_pct"] is not None else "–"
-                st.write(f"Kurs: **{ta['last_price']:.2f}** · Upside: **{upside_txt}** ({c['upside_kilde']})")
+                # Upside vises kun ved rigtig analytikerdækning — se core.py:compute_upside
+                if c["upside_pct"] is not None:
+                    st.write(f"Kurs: **{ta['last_price']:.2f}** · Upside: **{c['upside_pct']:+.1f}%** ({c['upside_kilde']})")
+                else:
+                    st.write(f"Kurs: **{ta['last_price']:.2f}**")
+                _upside_caveat_caption(c["upside_pct"])
 
                 cols = st.columns(2)
                 cols[0].metric("Indgangskurs (forslag)", f"{plan['entry_price']:.2f}")
@@ -324,20 +430,21 @@ with tab_top10:
 
                 with st.expander("Triggere, nøgletal og kilder"):
                     if rec.get("sell_triggers"):
-                        st.write("Sælg-signaler:", rec["sell_triggers"])
-                    st.write("Tekniske triggere (kort bane):", ta["ta_triggers"] or "Ingen")
+                        _render_triggers("🔴", "Sælg-signaler", rec["sell_triggers"])
+                    _render_triggers("📈", "Tekniske triggere (kort bane)", ta["ta_triggers"])
                     lt = c.get("long_term", {})
                     if lt.get("ok"):
-                        st.write("Langsigtede triggere (lang bane):", lt["long_term_triggers"] or "Ingen")
+                        _render_triggers("📊", "Langsigtede triggere (lang bane)", lt["long_term_triggers"])
                     fa = c.get("fundamental", {})
                     if fa.get("ok") and fa.get("fundamental_triggers"):
-                        st.write("Fundamentale styrker:", fa["fundamental_triggers"])
+                        _render_triggers("💰", "Fundamentale styrker", fa["fundamental_triggers"])
                     elif fa.get("ok") is False:
                         st.caption(f"Fundamentale nøgletal: ingen data ({fa.get('reason', '?')})")
+                    _render_aktieguld(c.get("aktieguld", {}))
                     a = c["analyst"]
                     if a.get("ok") and a.get("recommendation_key"):
-                        st.write(f"Analytiker-anbefaling: {a['recommendation_key']} "
-                                 f"({a.get('num_analysts', '?')} analytikere)")
+                        st.markdown(f"**🎯 Analytiker-anbefaling:** {a['recommendation_key']} "
+                                    f"({a.get('num_analysts', '?')} analytikere)")
                     st.caption("Ikke finansiel rådgivning — se README for forbehold.")
 
                 if c["ticker"] not in st.session_state.watchlist:

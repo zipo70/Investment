@@ -38,10 +38,15 @@ class Config:
     momentum_shift_lookback_days = 5
     volume_spike_window = 20
     volume_spike_threshold = 2.0
-    # --- Komposit-vægtning (teknisk / fundamental / popularitet) ---
-    weight_ta = 0.30
-    weight_fundamental = 0.25
-    weight_popularity = 0.45   # vægtet tungest — populæritet/tiltro har stor effekt (jf. bruger)
+    # --- Komposit-vægtning (teknisk / fundamental / popularitet / Aktieguld) ---
+    # Oprindeligt teknisk 30% / fundamental 25% / popularitet 45%. Aktieguld
+    # (jf. bruger, 2026-09) er tilføjet som en 4. faktor, vægtet 20% — de tre
+    # oprindelige er nedskaleret proportionalt for at give plads (30→24,
+    # 25→20, 45→36), ikke erstattet. Se get_aktieguld_data() for metoden.
+    weight_ta = 0.24
+    weight_fundamental = 0.20
+    weight_popularity = 0.36   # vægtet tungest — populæritet/tiltro har stor effekt (jf. bruger)
+    weight_aktieguld = 0.20
     long_term_lookback_days = 252   # ~12 måneder, til langsigtet momentum-trigger
     period_high_proximity_pct = 5.0  # "tæt på flerårs-højeste" = inden for X% af perioden-høj
     reddit_subreddits = ["stocks", "investing", "wallstreetbets"]
@@ -51,6 +56,13 @@ class Config:
     screener_shortlist_size = 20       # kun de N bedste TA-kandidater går videre
                                         # til analytiker-/sentiment-opslag
     sentiment_request_delay_sec = 1.0  # høflighedspause mellem API-kald i Top 10-scan
+    scan_request_delay_sec = 0.3        # kort høflighedspause i trin 1 (fuld-univers-
+                                         # scanning, ~93 tickere) — mindsker risikoen
+                                         # for rate-limitering fra Yahoo (se BACKLOG.md #3)
+    scan_skipped_data_warn_ratio = 0.2   # advar i GUI'en hvis andelen af "kunne ikke
+                                         # hentes" i en scanning overstiger denne andel
+                                         # af universet — tyder på rate-limitering, ikke
+                                         # et roligt marked (se BACKLOG.md #3)
     swing_hold_days = 20                # maks. holdeperiode (handelsdage) — bruges
                                          # til "stopud dato" i Top 10-fanen
     entry_window_days = 3               # indgangsforslaget regnes som "gyldigt" i
@@ -119,6 +131,16 @@ def region_of(ticker):
 # ============================================================================
 
 def fetch_ticker_df(ticker: str, period: str = "5y"):
+    """Henter kursdata for én ticker.
+
+    Retry-strategi (rettet — se BACKLOG.md #1): et TOMT svar UDEN exception
+    betyder næsten altid at tickeren ikke findes/er afnoteret/er stavet
+    forkert — at prøve igen hjælper ikke der, det spilder bare tid (op til
+    6 sekunder pr. "død" ticker, hvilket lagde sig markant oveni en
+    fuld-univers-scanning på ~93 tickere). Vi springer derfor MED DET SAMME
+    ved et tomt svar, og gemmer kun retry+backoff til RIGTIGE exceptions
+    (netværksfejl, timeout, rate-limiting), hvor et nyt forsøg faktisk kan
+    lykkes."""
     try:
         import yfinance as yf
     except ImportError:
@@ -128,47 +150,167 @@ def fetch_ticker_df(ticker: str, period: str = "5y"):
         try:
             df = yf.download(ticker, period=period, auto_adjust=False, progress=False, threads=False)
             if df is None or df.empty:
-                raise ValueError("tom respons")
+                return None, "ingen data (tickeren findes muligvis ikke, eller er afnoteret)"
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
             df = df.rename(columns={"Adj Close": "AdjClose"})
             return df, None
         except Exception as e:
             last_err = str(e)
-            time.sleep(1.0 * (attempt + 1))
+            if attempt < 2:
+                time.sleep(1.0 * (attempt + 1))
     return None, last_err
 
 
+# Statisk navn→ticker-opslag for hele det kuraterede univers (rettet — se
+# BACKLOG.md #2). Bruges som fallback, HVIS Yahoos uofficielle søge-API
+# skulle fejle/blive blokeret/rate-limitet — det er en ekstern, ugaranteret
+# tjeneste, så en indbygget liste over vores eget univers virker uafhængigt
+# af om den er oppe. Aliaser er små bogstaver, uden accenter/specialtegn.
+_NAME_ALIASES = {
+    "AAPL": (["apple"], "Apple Inc.", "NASDAQ"),
+    "MSFT": (["microsoft"], "Microsoft Corp.", "NASDAQ"),
+    "NVDA": (["nvidia"], "NVIDIA Corp.", "NASDAQ"),
+    "AMZN": (["amazon"], "Amazon.com Inc.", "NASDAQ"),
+    "GOOGL": (["google", "alphabet"], "Alphabet Inc.", "NASDAQ"),
+    "META": (["meta", "facebook"], "Meta Platforms Inc.", "NASDAQ"),
+    "TSLA": (["tesla"], "Tesla Inc.", "NASDAQ"),
+    "AVGO": (["broadcom"], "Broadcom Inc.", "NASDAQ"),
+    "ORCL": (["oracle"], "Oracle Corp.", "NYSE"),
+    "CRM": (["salesforce"], "Salesforce Inc.", "NYSE"),
+    "ADBE": (["adobe"], "Adobe Inc.", "NASDAQ"),
+    "NFLX": (["netflix"], "Netflix Inc.", "NASDAQ"),
+    "COST": (["costco"], "Costco Wholesale Corp.", "NASDAQ"),
+    "WMT": (["walmart"], "Walmart Inc.", "NYSE"),
+    "HD": (["home depot"], "Home Depot Inc.", "NYSE"),
+    "PG": (["procter", "procter gamble", "procter & gamble"], "Procter & Gamble Co.", "NYSE"),
+    "KO": (["coca cola", "coca-cola", "cocacola"], "Coca-Cola Co.", "NYSE"),
+    "PEP": (["pepsi", "pepsico"], "PepsiCo Inc.", "NASDAQ"),
+    "JNJ": (["johnson", "johnson & johnson", "johnson og johnson"], "Johnson & Johnson", "NYSE"),
+    "UNH": (["unitedhealth", "united health"], "UnitedHealth Group Inc.", "NYSE"),
+    "PFE": (["pfizer"], "Pfizer Inc.", "NYSE"),
+    "JPM": (["jpmorgan", "jp morgan"], "JPMorgan Chase & Co.", "NYSE"),
+    "BAC": (["bank of america"], "Bank of America Corp.", "NYSE"),
+    "V": (["visa"], "Visa Inc.", "NYSE"),
+    "MA": (["mastercard"], "Mastercard Inc.", "NYSE"),
+    "XOM": (["exxon", "exxonmobil", "exxon mobil"], "Exxon Mobil Corp.", "NYSE"),
+    "CVX": (["chevron"], "Chevron Corp.", "NYSE"),
+    "DIS": (["disney"], "Walt Disney Co.", "NYSE"),
+    "INTC": (["intel"], "Intel Corp.", "NASDAQ"),
+    "CSCO": (["cisco"], "Cisco Systems Inc.", "NASDAQ"),
+    "ASML.AS": (["asml"], "ASML Holding", "Amsterdam"),
+    "SAP.DE": (["sap"], "SAP SE", "Frankfurt"),
+    "MC.PA": (["lvmh"], "LVMH", "Paris"),
+    "OR.PA": (["loreal", "l'oreal", "l'oréal"], "L'Oréal", "Paris"),
+    "TTE.PA": (["totalenergies", "total energies", "total"], "TotalEnergies", "Paris"),
+    "AIR.PA": (["airbus"], "Airbus SE", "Paris"),
+    "SAN.PA": (["sanofi"], "Sanofi", "Paris"),
+    "SIE.DE": (["siemens"], "Siemens AG", "Frankfurt"),
+    "ALV.DE": (["allianz"], "Allianz SE", "Frankfurt"),
+    "BAS.DE": (["basf"], "BASF SE", "Frankfurt"),
+    "NOVN.SW": (["novartis"], "Novartis AG", "Zürich"),
+    "NESN.SW": (["nestle", "nestlé"], "Nestlé SA", "Zürich"),
+    "ROG.SW": (["roche"], "Roche Holding AG", "Zürich"),
+    "AZN.L": (["astrazeneca", "astra zeneca"], "AstraZeneca", "London"),
+    "SHEL.L": (["shell"], "Shell plc", "London"),
+    "HSBA.L": (["hsbc"], "HSBC Holdings", "London"),
+    "ULVR.L": (["unilever"], "Unilever plc", "London"),
+    "IBE.MC": (["iberdrola"], "Iberdrola SA", "Madrid"),
+    "NOVO-B.CO": (["novo", "novo nordisk", "novonordisk"], "Novo Nordisk", "København"),
+    "MAERSK-B.CO": (["maersk", "mærsk", "moller maersk", "møller mærsk", "ap moller"], "A.P. Møller - Mærsk", "København"),
+    "VWS.CO": (["vestas"], "Vestas Wind Systems", "København"),
+    "ORSTED.CO": (["orsted", "ørsted"], "Ørsted", "København"),
+    "DSV.CO": (["dsv"], "DSV", "København"),
+    "GMAB.CO": (["genmab"], "Genmab", "København"),
+    "COLO-B.CO": (["coloplast"], "Coloplast", "København"),
+    "ERIC-B.ST": (["ericsson"], "Ericsson", "Stockholm"),
+    "VOLV-B.ST": (["volvo"], "Volvo AB", "Stockholm"),
+    "ATCO-A.ST": (["atlas copco"], "Atlas Copco", "Stockholm"),
+    "INVE-B.ST": (["investor ab", "investor"], "Investor AB", "Stockholm"),
+    "HM-B.ST": (["h&m", "hm", "hennes mauritz", "hennes & mauritz"], "H&M", "Stockholm"),
+    "SAND.ST": (["sandvik"], "Sandvik AB", "Stockholm"),
+    "EQNR.OL": (["equinor"], "Equinor ASA", "Oslo"),
+    "DNB.OL": (["dnb"], "DNB Bank ASA", "Oslo"),
+    "TEL.OL": (["telenor"], "Telenor ASA", "Oslo"),
+    "NOKIA.HE": (["nokia"], "Nokia Oyj", "Helsinki"),
+    "SAMPO.HE": (["sampo"], "Sampo Oyj", "Helsinki"),
+    "TSM": (["taiwan semiconductor", "tsmc"], "Taiwan Semiconductor (ADR)", "NYSE"),
+    "BABA": (["alibaba"], "Alibaba Group (ADR)", "NYSE"),
+    "PDD": (["pdd", "pinduoduo", "temu"], "PDD Holdings (ADR)", "NASDAQ"),
+    "JD": (["jd.com", "jd com"], "JD.com Inc. (ADR)", "NASDAQ"),
+    "TCEHY": (["tencent"], "Tencent Holdings (ADR)", "OTC"),
+    "INFY": (["infosys"], "Infosys Ltd. (ADR)", "NYSE"),
+    "IBN": (["icici", "icici bank"], "ICICI Bank (ADR)", "NYSE"),
+    "HDB": (["hdfc", "hdfc bank"], "HDFC Bank (ADR)", "NYSE"),
+    "MELI": (["mercadolibre", "mercado libre"], "MercadoLibre Inc.", "NASDAQ"),
+    "VALE": (["vale"], "Vale SA", "NYSE"),
+    "ITUB": (["itau", "itaú", "itau unibanco"], "Itaú Unibanco (ADR)", "NYSE"),
+    "PBR": (["petrobras"], "Petrobras (ADR)", "NYSE"),
+    "AMX": (["america movil", "américa móvil"], "América Móvil (ADR)", "NYSE"),
+}
+
+
+def _match_static_alias(query: str):
+    """Matcher en fri søgetekst mod _NAME_ALIASES. Tjekker i rækkefølge:
+    (1) tickeren selv skrevet direkte, (2) et præcist aliasmatch, (3) et
+    løsere delvist match — så det mest sikre match altid vinder."""
+    q = " ".join(query.strip().lower().split())
+    if not q:
+        return None
+    for ticker, (aliases, name, exch) in _NAME_ALIASES.items():
+        if q == ticker.lower():
+            return ticker, name, exch
+    for ticker, (aliases, name, exch) in _NAME_ALIASES.items():
+        if q in aliases:
+            return ticker, name, exch
+    for ticker, (aliases, name, exch) in _NAME_ALIASES.items():
+        if any(a.startswith(q) or q in a for a in aliases):
+            return ticker, name, exch
+    return None
+
+
 def resolve_ticker(query: str):
-    """Slår et frit navn/ticker op via Yahoo Finances (uofficielle) søge-API,
-    så man kan skrive fx "novo" i stedet for at kende den præcise Yahoo-
-    ticker-syntaks (NOVO-B.CO). Returnerer (symbol, visningsnavn, børs) —
-    eller (None, None, None) hvis søgningen fejler eller intet findes, så
-    kaldende kode altid kan falde tilbage til at bruge inputtet som ticker
-    direkte."""
+    """Slår et frit navn/ticker op, så man kan skrive fx "novo" i stedet for
+    at kende den præcise Yahoo-ticker-syntaks (NOVO-B.CO). To trin:
+
+    1) Yahoo Finances (uofficielle) søge-API — dækker langt flere aktier
+       end vores eget univers, men er ugaranteret og kan fejle/blive
+       rate-limitet/blokeret uden varsel (se BACKLOG.md #2).
+    2) Falder tilbage til en indbygget navn-liste for det kuraterede
+       univers (~93 aktier), som virker uafhængigt af Yahoos søge-API.
+
+    Returnerer (symbol, visningsnavn, børs) — eller (None, None, None) hvis
+    intet findes, så kaldende kode altid kan falde tilbage til at bruge
+    inputtet som ticker direkte. Fejl fra trin 1 logges (synligt i appens
+    driftslog), i stedet for at forsvinde stille."""
     try:
         import requests
-    except ImportError:
-        return None, None, None
-    try:
         resp = requests.get(
             "https://query2.finance.yahoo.com/v1/finance/search",
             params={"q": query, "quotesCount": 6, "newsCount": 0, "lang": "en-US"},
             headers={"User-Agent": "Mozilla/5.0 (Mine Aktier; personligt værktøj)"},
             timeout=6,
         )
-        if resp.status_code != 200:
-            return None, None, None
-        quotes = [q for q in (resp.json().get("quotes") or []) if q.get("symbol")]
-        equities = [q for q in quotes if q.get("quoteType") == "EQUITY"] or quotes
-        if not equities:
-            return None, None, None
-        top = equities[0]
-        name = top.get("shortname") or top.get("longname") or top["symbol"]
-        exchange = top.get("exchDisp") or top.get("exchange")
-        return top["symbol"], name, exchange
-    except Exception:
-        return None, None, None
+        if resp.status_code == 200:
+            quotes = [q for q in (resp.json().get("quotes") or []) if q.get("symbol")]
+            equities = [q for q in quotes if q.get("quoteType") == "EQUITY"] or quotes
+            if equities:
+                top = equities[0]
+                name = top.get("shortname") or top.get("longname") or top["symbol"]
+                exchange = top.get("exchDisp") or top.get("exchange")
+                return top["symbol"], name, exchange
+            print(f"resolve_ticker: Yahoo-søgning gav ingen aktie-resultater for '{query}' — prøver indbygget liste.")
+        else:
+            print(f"resolve_ticker: Yahoo-søgning svarede HTTP {resp.status_code} for '{query}' — prøver indbygget liste.")
+    except ImportError:
+        pass
+    except Exception as e:
+        print(f"resolve_ticker: Yahoo-søgning fejlede for '{query}' ({e}) — prøver indbygget liste.")
+
+    match = _match_static_alias(query)
+    if match:
+        return match
+    return None, None, None
 
 
 def get_ticker_meta(ticker: str) -> dict:
@@ -455,6 +597,185 @@ def get_fundamental_data(ticker):
         return {"ok": False, "reason": f"kunne ikke hente nøgletal: {e}"}
 
 
+def get_aktieguld_data(ticker: str, fundamental: dict) -> dict:
+    """"Aktieguld"-point: en tilnærmet gengivelse af Jens Løgstrups 4-fase-
+    model fra bogen "Aktieguld" (jf. bruger, 2026-09), udregnet fra Yahoo
+    Finance-nøgletal i stedet for en manuel/kvalitativ vurdering pr. aktie.
+
+    GENNEMSIGTIGHED (vigtigt at vide): bogens fulde metode er ikke
+    offentligt tilgængelig — hverken via websøgning (tjekket 2026-09-17,
+    kun boghandler-sider og anmeldelser, ingen gengiver selve modellen)
+    eller i brugerens eget eksempel (en Royal Unibrew-analyse fra brugerens
+    egen chat, som viste sig at være afbrudt lige før Fase 3's kriterieliste
+    kunne læses). Fase 1's 5 spørgsmål og Fase 2's formel er derfor kendt
+    ORDRET (fra det eksempel); Fase 3's 7 "kvalitetspunkter" og Fase 4's
+    A/B/C/D-tærskler er IKKE kendt ordret og er derfor min egen, tydeligt
+    markerede fortolkning — ikke bogens egen formel. Sig til hvis du på et
+    tidspunkt finder/kan indsætte den ordrette liste — så rettes det til.
+
+    Fase 1 — Strategisk Analyse (proxy for 4 af de 5 spørgsmål; "vil
+    produkterne være relevante om 5+ år" har intet godt Yahoo-nøgletal og
+    indgår derfor ikke direkte i denne tilnærmelse):
+      - "marked i vækst?"        → omsætningsvækst (revenueGrowth)
+      - "lønsomt marked?"        → overskudsgrad (profitMargins)
+      - "stigende overskud 5+ år?" → indtjeningsvækst (earningsGrowth,
+        proxy — Yahoo giver ikke gratis en 5-års-historik af dette)
+      - "modstår hård konkurrence?" → egenkapitalforrentning (ROE), som
+        grov proxy for konkurrencemæssig styrke/"moat"
+
+    Fase 2 — Afkastberegning (ORDRET FORMEL fra brugerens eksempel):
+      Forventet afkast % = Overskudsvækst % + Aktietilbagekøb % + Udbytte %
+      Aktietilbagekøb hentes fra cashflow-opgørelsen — kun her ved den
+      dybdegående enkelt-aktie-analyse, IKKE i fuld-univers-scanningen
+      (find_top_candidates trin 1), for ikke at øge risikoen for
+      rate-limitering (se BACKLOG.md #3).
+
+    Fase 3 — Kvalitetspoint (MIN EGEN FORTOLKNING, ikke bogens 7 punkter):
+      insider-ejerskab, institutionelt ejerskab, lav gæld/egenkapital,
+      en sund udlodningsgrad, og lav beta (kursstabilitet) — som
+      stedfortrædere for stikordene i brugerens eksempel ("stærk ledelse",
+      "fokus", "robusthed", "udlodning").
+
+    Fase 4 — Vedligehold/Konklusion: forsøges IKKE gengivet som en separat
+    A/B/C/D-bogstav-konklusion, da tærsklerne er ukendte — den rolle
+    varetages i stedet af appens eksisterende KØB/HOLD/SÆLG-anbefaling
+    (compute_recommendation).
+
+    De tre fase-scorer (hver 0-100) vægtes ligeligt til én samlet
+    `aktieguld_score` (0-100), da bogen ikke angiver en indbyrdes vægtning
+    mellem faserne."""
+    try:
+        import yfinance as yf
+    except ImportError:
+        return {"ok": False, "reason": "yfinance ikke installeret"}
+    try:
+        t = yf.Ticker(ticker)
+        try:
+            info = t.info or {}
+        except Exception:
+            info = {}
+        if not info:
+            return {"ok": False, "reason": "ingen nøgletal tilgængelige"}
+
+        triggers = []
+        fa_ok = fundamental.get("ok", False)
+
+        # --- Fase 1: Strategisk Analyse ---
+        revenue_growth = fundamental.get("revenue_growth") if fa_ok else info.get("revenueGrowth")
+        profit_margin = fundamental.get("profit_margin") if fa_ok else info.get("profitMargins")
+        earnings_growth = fundamental.get("earnings_growth") if fa_ok else info.get("earningsGrowth")
+        roe = fundamental.get("roe") if fa_ok else info.get("returnOnEquity")
+
+        fase1_scores = []
+        if revenue_growth is not None:
+            fase1_scores.append(max(0.0, min(100.0, 50.0 + revenue_growth * 100.0 * 2.5)))
+        if profit_margin is not None:
+            fase1_scores.append(max(0.0, min(100.0, profit_margin * 100.0 / 25.0 * 100.0)))
+        if earnings_growth is not None:
+            fase1_scores.append(max(0.0, min(100.0, 50.0 + earnings_growth * 100.0 * 2.5)))
+        if roe is not None:
+            fase1_scores.append(max(0.0, min(100.0, roe * 100.0 / 20.0 * 100.0)))
+        fase1_score = sum(fase1_scores) / len(fase1_scores) if fase1_scores else None
+        if fase1_score is not None and fase1_score >= 65:
+            triggers.append(f"Stærk strategisk position (Fase 1: {fase1_score:.0f}/100)")
+
+        # --- Fase 2: Afkastberegning (ordret formel) ---
+        overskudsvaekst_pct = (
+            earnings_growth * 100.0 if earnings_growth is not None
+            else (revenue_growth * 100.0 if revenue_growth is not None else None)
+        )
+
+        buyback_pct = None
+        try:
+            cf = t.cashflow
+            market_cap = info.get("marketCap")
+            if cf is not None and not cf.empty and market_cap:
+                buyback_row = None
+                for label in ("Repurchase Of Capital Stock", "Repurchase Of Common Stock",
+                              "CommonStockRepurchased", "Repurchase Of Stock"):
+                    if label in cf.index:
+                        buyback_row = cf.loc[label]
+                        break
+                if buyback_row is not None and len(buyback_row) > 0:
+                    latest = buyback_row.iloc[0]
+                    if pd.notna(latest):
+                        buyback_pct = abs(float(latest)) / market_cap * 100.0
+        except Exception:
+            pass
+
+        udbytte_pct = None
+        dy = info.get("dividendYield")
+        if dy is not None:
+            # Yahoo har historisk skiftet mellem andel (0.03) og procent (3.0)
+            # for dette felt afhængigt af version — normaliser til procent.
+            udbytte_pct = dy * 100.0 if dy < 1 else dy
+
+        afkast_dele = [v for v in (overskudsvaekst_pct, buyback_pct, udbytte_pct) if v is not None]
+        forventet_afkast_pct = sum(afkast_dele) if afkast_dele else None
+        fase2_score = None
+        if forventet_afkast_pct is not None:
+            # Kalibrering (min egen, ikke bogens): 0% → 0 point, ~10% → 50
+            # point, 20%+ → 100 point. Groft justeret efter brugerens
+            # eksempel, hvor bogen selv sammenligner med "statsobligationer
+            # (~2-3%)" og "gennemsnitligt aktieafkast (~7-10%)".
+            fase2_score = max(0.0, min(100.0, forventet_afkast_pct * 5.0))
+            if forventet_afkast_pct >= 10:
+                triggers.append(
+                    f"Attraktivt forventet afkast ({forventet_afkast_pct:+.1f}%: "
+                    f"{overskudsvaekst_pct or 0:.1f}% overskudsvækst + "
+                    f"{buyback_pct or 0:.1f}% tilbagekøb + {udbytte_pct or 0:.1f}% udbytte)"
+                )
+
+        # --- Fase 3: Kvalitetspoint (fortolkning, se docstring) ---
+        insiders = info.get("heldPercentInsiders")
+        institutions = info.get("heldPercentInstitutions")
+        debt_to_equity = fundamental.get("debt_to_equity") if fa_ok else info.get("debtToEquity")
+        payout_ratio = info.get("payoutRatio")
+        beta = info.get("beta")
+
+        fase3_scores = []
+        if insiders is not None:
+            fase3_scores.append(max(0.0, min(100.0, insiders * 100.0 / 10.0 * 100.0)))
+        if institutions is not None:
+            fase3_scores.append(max(0.0, min(100.0, institutions * 100.0)))
+        if debt_to_equity is not None:
+            fase3_scores.append(max(0.0, min(100.0, 100.0 - debt_to_equity / 2.0)))
+        if payout_ratio is not None:
+            p = payout_ratio * 100.0
+            # En "sund" udlodningsgrad (60-100%) ses som kvalitetstegn — en
+            # for lav (<60%) eller for høj (>100%, dvs. udbetaler mere end
+            # overskuddet) trækker ned.
+            if 60.0 <= p <= 100.0:
+                fase3_scores.append(100.0)
+            elif p < 60.0:
+                fase3_scores.append(max(0.0, p / 60.0 * 100.0))
+            else:
+                fase3_scores.append(max(0.0, 100.0 - (p - 100.0)))
+        if beta is not None:
+            fase3_scores.append(max(0.0, min(100.0, 100.0 - abs(beta - 1.0) * 50.0)))
+        fase3_score = sum(fase3_scores) / len(fase3_scores) if fase3_scores else None
+        if fase3_score is not None and fase3_score >= 65:
+            triggers.append(f"Solidt kvalitetsbillede (Fase 3: {fase3_score:.0f}/100)")
+
+        component_scores = [s for s in (fase1_score, fase2_score, fase3_score) if s is not None]
+        aktieguld_score = sum(component_scores) / len(component_scores) if component_scores else None
+
+        return {
+            "ok": aktieguld_score is not None,
+            "fase1_score": fase1_score,
+            "fase2_score": fase2_score,
+            "fase2_forventet_afkast_pct": forventet_afkast_pct,
+            "fase2_overskudsvaekst_pct": overskudsvaekst_pct,
+            "fase2_buyback_pct": buyback_pct,
+            "fase2_udbytte_pct": udbytte_pct,
+            "fase3_score": fase3_score,
+            "aktieguld_score": aktieguld_score,
+            "aktieguld_triggers": triggers,
+        }
+    except Exception as e:
+        return {"ok": False, "reason": f"kunne ikke beregne Aktieguld-point: {e}"}
+
+
 def get_stocktwits_data(ticker):
     try:
         import requests
@@ -537,15 +858,21 @@ def _reddit_score(reddit: dict):
 
 
 def compute_upside(ta, analyst):
+    """Upside baseres UDELUKKENDE på analytiker-konsensus (gennemsnitligt
+    kursmål). Rettet efter brugerfeedback (Jacobi, 2026-08-28): der var
+    tidligere en fallback til et "teknisk estimat" (afstand op til den
+    højeste kurs i historikken) når ingen analytikere dækkede aktien — det
+    var misvisende, fordi det ikke er en fremadskuende vurdering af nogen
+    art, bare en afstandsmåling, men blev vist under samme "Upside"-label
+    som den rigtige analytikervurdering. Nu vises INTET upside-tal, når der
+    ikke er analytikerdækning — GUI'en (app.py) udelader hele
+    "Upside: ..."-linjen i det tilfælde, i stedet for et misvisende tal."""
     last_price = ta["last_price"]
     if analyst.get("ok") and analyst.get("target_mean") and last_price:
         n = analyst.get("num_analysts")
         kilde = f"Analytiker-konsensus ({n} analytikere)" if n else "Analytiker-konsensus"
         return (analyst["target_mean"] / last_price - 1.0) * 100.0, kilde
-    high_252 = ta.get("high_252w")
-    if high_252 and last_price and last_price < high_252:
-        return (high_252 / last_price - 1.0) * 100.0, "Teknisk estimat (afstand til 52-ugers højeste)"
-    return None, "Intet analytikerdækning og intet klart teknisk mål"
+    return None, "Ingen analytikerdækning"
 
 
 def popularity_score(analyst, stocktwits, reddit):
@@ -562,13 +889,16 @@ def popularity_score(analyst, stocktwits, reddit):
     return sum(c * w for c, w in zip(comps, weights)) / sum(weights)
 
 
-def combine_composite_score(ta, long_term, fundamental, popularity_val, cfg):
-    """Slår teknisk (kort+lang bane), fundamental og popularitets-score sammen
-    til den endelige komposit-rating (0-100). Standardvægtning: teknisk 30% /
-    fundamental 25% / popularitet 45% — popularitet vægtes tungest, fordi
-    tiltro/opmærksomhed har stor effekt på om et setup rent faktisk spiller
-    ud (jf. bruger). Manglende data på en faktor giver en neutral 50 i
-    stedet for at straffe aktien for manglende dækning."""
+def combine_composite_score(ta, long_term, fundamental, popularity_val, aktieguld, cfg):
+    """Slår teknisk (kort+lang bane), fundamental, popularitets- og
+    Aktieguld-score sammen til den endelige komposit-rating (0-100).
+    Standardvægtning: teknisk 24% / fundamental 20% / popularitet 36% /
+    Aktieguld 20% (jf. bruger, 2026-09 — Aktieguld tilføjet som 4. faktor,
+    de tre oprindelige nedskaleret proportionalt, se Config). Popularitet
+    vægtes stadig tungest blandt de fire, fordi tiltro/opmærksomhed har stor
+    effekt på om et setup rent faktisk spiller ud (jf. bruger). Manglende
+    data på en faktor giver en neutral 50 i stedet for at straffe aktien for
+    manglende dækning."""
     if long_term.get("ok"):
         ta_combined = 0.6 * ta["ta_score"] + 0.4 * long_term["long_term_score"]
     else:
@@ -576,7 +906,10 @@ def combine_composite_score(ta, long_term, fundamental, popularity_val, cfg):
     fa_score = fundamental.get("fundamental_score") if fundamental.get("ok") else None
     fa_score = fa_score if fa_score is not None else 50.0
     pop_score = popularity_val if popularity_val is not None else 50.0
-    return cfg.weight_ta * ta_combined + cfg.weight_fundamental * fa_score + cfg.weight_popularity * pop_score
+    ag_score = aktieguld.get("aktieguld_score") if aktieguld and aktieguld.get("ok") else None
+    ag_score = ag_score if ag_score is not None else 50.0
+    return (cfg.weight_ta * ta_combined + cfg.weight_fundamental * fa_score
+            + cfg.weight_popularity * pop_score + cfg.weight_aktieguld * ag_score)
 
 
 def compute_recommendation(ta, long_term, fundamental, stocktwits, plan, composite_score) -> dict:
@@ -693,14 +1026,17 @@ def analyze_ticker(ticker: str):
     stocktwits = get_stocktwits_data(ticker)
     reddit = get_reddit_data(ticker, cfg, company_name=analyst.get("short_name"))
     pop = popularity_score(analyst, stocktwits, reddit)
-    composite = combine_composite_score(ta, long_term, fundamental, pop, cfg)
+    aktieguld = get_aktieguld_data(ticker, fundamental)
+    composite = combine_composite_score(ta, long_term, fundamental, pop, aktieguld, cfg)
     upside, upside_kilde = compute_upside(ta, analyst)
     plan = compute_trade_plan(df, ta["last_price"], cfg)
     recommendation = compute_recommendation(ta, long_term, fundamental, stocktwits, plan, composite)
     return {
         "ok": True, "ta": ta, "long_term": long_term, "fundamental": fundamental,
         "analyst": analyst, "stocktwits": stocktwits, "reddit": reddit,
-        "composite_score": composite, "upside_pct": upside, "upside_kilde": upside_kilde,
+        "aktieguld": aktieguld,
+        "composite_score": composite, "popularity_score": pop,
+        "upside_pct": upside, "upside_kilde": upside_kilde,
         "plan": plan, "recommendation": recommendation,
         "short_name": analyst.get("short_name"),
     }
@@ -721,18 +1057,25 @@ def find_top_candidates(top_n: int = 10):
     universe = [t for t in full_universe() if t != BENCHMARK]
 
     # --- Trin 1: teknisk scanning af hele universet ---
+    # Kort høflighedspause mellem kaldene (rettet — se BACKLOG.md #3): uden
+    # den kan mange hurtige, sekventielle kald til Yahoo Finance udløse
+    # midlertidig rate-limitering, som kan få langt flere tickere end
+    # normalt til at fejle datahentningen — og dermed give et kunstigt lille
+    # antal kandidater i Top 10, uafhængigt af om markedet reelt er svagt.
     ta_pass = []
     skipped_data, skipped_trend = 0, 0
-    for ticker in universe:
+    for i, ticker in enumerate(universe):
         df, err = fetch_ticker_df(ticker, period="5y")
         if df is None:
             skipped_data += 1
-            continue
-        ta = compute_technical_signals(df, cfg)
-        if not ta.get("ok") or not ta.get("trend_ok"):
-            skipped_trend += 1
-            continue
-        ta_pass.append({"ticker": ticker, "ta": ta})
+        else:
+            ta = compute_technical_signals(df, cfg)
+            if not ta.get("ok") or not ta.get("trend_ok"):
+                skipped_trend += 1
+            else:
+                ta_pass.append({"ticker": ticker, "ta": ta})
+        if i < len(universe) - 1:
+            time.sleep(cfg.scan_request_delay_sec)
 
     ta_pass.sort(key=lambda r: r["ta"]["ta_score"], reverse=True)
     shortlist = ta_pass[: cfg.screener_shortlist_size]
@@ -750,7 +1093,8 @@ def find_top_candidates(top_n: int = 10):
         stocktwits = get_stocktwits_data(ticker)
         reddit = get_reddit_data(ticker, cfg, company_name=analyst.get("short_name"))
         pop = popularity_score(analyst, stocktwits, reddit)
-        composite = combine_composite_score(ta, long_term, fundamental, pop, cfg)
+        aktieguld = get_aktieguld_data(ticker, fundamental)
+        composite = combine_composite_score(ta, long_term, fundamental, pop, aktieguld, cfg)
         upside, upside_kilde = compute_upside(ta, analyst)
         plan = compute_trade_plan(df, ta["last_price"], cfg)
         recommendation = compute_recommendation(ta, long_term, fundamental, stocktwits, plan, composite)
@@ -759,7 +1103,9 @@ def find_top_candidates(top_n: int = 10):
             "ticker": ticker, "region": region_of(ticker), "ta": ta,
             "long_term": long_term, "fundamental": fundamental,
             "analyst": analyst, "stocktwits": stocktwits, "reddit": reddit,
-            "composite_score": composite, "upside_pct": upside, "upside_kilde": upside_kilde,
+            "aktieguld": aktieguld,
+            "composite_score": composite, "popularity_score": pop,
+            "upside_pct": upside, "upside_kilde": upside_kilde,
             "short_name": analyst.get("short_name") or ticker, "plan": plan, "meta": meta,
             "recommendation": recommendation,
         })
@@ -767,9 +1113,15 @@ def find_top_candidates(top_n: int = 10):
             time.sleep(cfg.sentiment_request_delay_sec)
 
     results.sort(key=lambda r: r["composite_score"], reverse=True)
+    universe_size = len(universe)
     stats = {
-        "universe_size": len(universe), "skipped_data": skipped_data,
+        "universe_size": universe_size, "skipped_data": skipped_data,
         "skipped_trend": skipped_trend, "shortlist_size": len(shortlist),
+        # Rettet — se BACKLOG.md #3: signalerer til GUI'en at usædvanligt
+        # mange tickere fejlede datahentning, som tyder på midlertidig
+        # rate-limitering snarere end et roligt marked.
+        "high_skip_rate": (universe_size > 0
+                            and (skipped_data / universe_size) > cfg.scan_skipped_data_warn_ratio),
     }
     return results[:top_n], stats
 
