@@ -226,9 +226,17 @@ popularitet 45% — nedskaleret proportionalt da Aktieguld blev tilføjet som
   baseret på 5 års historik) vægtet 40%.
 - **Fundamental (20%)**: rigtige regnskabstal fra Yahoo Finance (P/E, PEG,
   overskudsgrad, omsætnings-/indtjeningsvækst, egenkapitalforrentning,
-  gæld/egenkapital) — IKKE bare analytikernes anbefaling som før. Dette er
-  en simpel, sektor-uafhængig heuristik (en bank og en tech-aktie vurderes
-  på samme skala) — brug som groft filter, ikke præcis værdiansættelse.
+  gæld/egenkapital, og — tilføjet efter bruger-ønske, Genmab-eksempel,
+  2026-09-18 — forward P/E vs. nuværende P/E, price/sales, frit cash
+  flow-afkast og insiderejerskab) — IKKE bare analytikernes anbefaling som
+  før. Dette er en simpel, sektor-uafhængig heuristik (en bank og en
+  tech-aktie vurderes på samme skala) — brug som groft filter, ikke præcis
+  værdiansættelse. **Bevidst fravalgt**: konkrete begivenheder/katalysatorer
+  (fx FDA-godkendelser, fase 3-udlæsninger) — den slags data findes ikke
+  gratis via Yahoo Finance, kun subjektiv/manuel indtastning ville kunne
+  gøre det, hvilket brugeren selv fravalgte. Som den eneste tidsbestemte
+  info vises næste regnskabsdato (hvis kendt) som en ren info-linje under
+  "Detaljer"/"Triggere" — indgår ikke i nogen score.
 - **Popularitet (36%, vægtet tungest)**: analytiker-anbefaling +
   StockTwits-sentiment + Reddit-omtale, som før — men nu med højere vægt,
   da tiltro/opmærksomhed har stor effekt på om et setup rent faktisk
@@ -276,6 +284,34 @@ Fase 3's 7 kriterier eller Fase 4's tærskler (fx ved at gå tilbage til den
 oprindelige chat, hvor teksten blev afbrudt) — så rettes tilnærmelsen til
 den rigtige formel. Se de tre delscorer (Fase 1/2/3) og en kort begrundelse
 under "Detaljer"/"Triggere, nøgletal og kilder" på hvert kort.
+
+### Sektor-rotation — info-badge (påvirker IKKE komposit-scoren)
+
+Efter bruger-ønske (jf. bruger, 2026-09-17) viser hvert kort nu også et
+sektor-rotations-badge under "Detaljer"/"Triggere, nøgletal og kilder" —
+udtrykkeligt bekræftet som et **rent informations-badge**: det tæller ikke
+med i komposit-scoren, og de fire faktor-vægte (24/20/36/20 ovenfor) er
+uændrede.
+
+Metode (`core.py:get_sector_rotation_map` / `get_sector_signal`): en
+sektors "rotation" måles som dens RELATIVE styrke — den amerikanske
+sektor-ETF's kursafkast de seneste ~3 måneder minus verdensindekset (ACWI)
+i samme periode. Er forskellen ≥ +3 procentpoint er sektoren "i medvind"
+(🟢, slår markedet), er den ≤ -3 procentpoint er den "i modvind" (🔴,
+halter efter); derimellem er den neutral (⚪). Aktiens sektor slås op via
+Yahoo Finances GICS-klassifikation (fx "Technology", "Energy") og matches
+til den tilsvarende amerikanske sektor-ETF (SPDR Select Sector-serien: XLK,
+XLF, XLV, XLE, XLI, XLY, XLP, XLU, XLB, XLRE, XLC).
+
+**Forbehold**: der findes ingen separate danske/europæiske sektor-ETF'er,
+så for ikke-amerikanske aktier (herunder danske) bruges den globale
+GICS-sektor som et proxy-signal — sektor-cyklusser hænger langt fra
+perfekt sammen på tværs af markeder, men bruger har accepteret dette frem
+for slet ingen sektor-info for hovedparten af sine aktier. Mangler aktiens
+sektor (ukendt hos Yahoo) eller kunne ETF-dataene ikke hentes, udelades
+badge'en helt i stedet for at vise et misvisende tal. Sektor-kortet
+genberegnes højst hvert 1. time (cachet), da 3-måneders afkast alligevel
+ikke ændrer sig fra minut til minut.
 
 **KØB/HOLD/SÆLG-anbefaling**: ud over komposit-scoren viser hvert kort nu
 også en klar handling. Sælg-signaler er en symmetrisk modpart til de

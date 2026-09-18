@@ -530,8 +530,9 @@ def get_fundamental_data(ticker):
     except ImportError:
         return {"ok": False, "reason": "yfinance ikke installeret"}
     try:
+        t = yf.Ticker(ticker)
         try:
-            info = yf.Ticker(ticker).info or {}
+            info = t.info or {}
         except Exception:
             info = {}
         if not info:
@@ -544,6 +545,19 @@ def get_fundamental_data(ticker):
         earnings_growth = info.get("earningsGrowth") or info.get("earningsQuarterlyGrowth")
         roe = info.get("returnOnEquity")
         debt_to_equity = info.get("debtToEquity")           # typisk i procent, fx 45.2 = 0.45x
+        sector = info.get("sector")                          # GICS-sektornavn, fx "Technology" — bruges kun til sektor-rotations-badge (se get_sector_signal), indgår ikke i fundamental_score
+
+        # --- Udvidet efter bruger-ønske (Jacobi, 2026-09-18, Genmab-eksempel:
+        # "der mangler nogle fundamentale triggere") — flere generelle
+        # nøgletal fra Yahoo Finance, ikke konkrete begivenheder/katalysatorer
+        # (fx FDA-godkendelser), som brugeren selv bekræftede ikke findes
+        # gratis og derfor er fravalgt. ---
+        forward_pe = info.get("forwardPE")
+        price_to_sales = info.get("priceToSalesTrailing12Months")
+        market_cap = info.get("marketCap")
+        free_cashflow = info.get("freeCashflow")
+        fcf_yield_pct = (free_cashflow / market_cap * 100.0) if (free_cashflow is not None and market_cap) else None
+        insiders = info.get("heldPercentInsiders")
 
         subscores, weights, triggers = [], [], []
 
@@ -583,14 +597,68 @@ def get_fundamental_data(ticker):
             if peg < 1.5:
                 triggers.append(f"Attraktiv PEG-ratio ({peg:.1f})")
 
+        if forward_pe is not None and forward_pe > 0 and pe is not None and pe > 0:
+            # Forward P/E lavere end nuværende P/E -> markedet forventer
+            # stigende indtjening fremadrettet (relevant for fx biotek med
+            # ventede godkendelser/lancering, hvor nuværende indtjening ikke
+            # afspejler det — jf. bruger, Genmab-eksempel).
+            forbedring_pct = (pe - forward_pe) / pe * 100.0
+            s = max(0.0, min(100.0, 50.0 + forbedring_pct * 2.0))
+            subscores.append(s); weights.append(0.10)
+            if forbedring_pct > 15:
+                triggers.append(
+                    f"Forward P/E ({forward_pe:.1f}) markant lavere end nuværende P/E "
+                    f"({pe:.1f}) — markedet forventer stigende indtjening"
+                )
+
+        if price_to_sales is not None and price_to_sales > 0:
+            s = max(0.0, min(100.0, 100.0 - (price_to_sales - 1.0) * 10.0))
+            subscores.append(s); weights.append(0.10)
+            if price_to_sales < 5:
+                triggers.append(f"Attraktiv price/sales-ratio ({price_to_sales:.1f})")
+
+        if fcf_yield_pct is not None:
+            s = max(0.0, min(100.0, 50.0 + fcf_yield_pct * 5.0))
+            subscores.append(s); weights.append(0.15)
+            if fcf_yield_pct > 5:
+                triggers.append(f"Solidt frit cash flow-afkast ({fcf_yield_pct:.1f}% af markedsværdi)")
+
+        if insiders is not None:
+            s = max(0.0, min(100.0, insiders * 100.0 / 10.0 * 100.0))
+            subscores.append(s); weights.append(0.05)
+            if insiders > 0.05:
+                triggers.append(f"Højt insiderejerskab ({insiders*100:.0f}%)")
+
         fundamental_score = (
             sum(s * w for s, w in zip(subscores, weights)) / sum(weights) if subscores else None
         )
 
+        # Kommende regnskabsdato — REN INFO, indgår IKKE i fundamental_score
+        # eller nogen trigger/score. Dette er IKKE et forsøg på at gengive
+        # specifikke begivenheder/katalysatorer (fx FDA-afgørelser, fase 3-
+        # udlæsninger) — det findes ikke gratis via Yahoo Finance, og
+        # brugeren har selv bekræftet at det er fravalgt. Næste regnskabs-
+        # dato er blot den eneste tidsbestemte begivenhed der ér tilgængelig.
+        next_earnings_date = None
+        try:
+            cal = t.calendar
+            if isinstance(cal, dict):
+                dates = cal.get("Earnings Date")
+                if dates:
+                    next_earnings_date = str(dates[0] if isinstance(dates, (list, tuple)) else dates)
+            elif cal is not None and hasattr(cal, "empty") and not cal.empty and "Earnings Date" in cal.index:
+                val = cal.loc["Earnings Date"]
+                next_earnings_date = str(val.iloc[0] if hasattr(val, "iloc") else val)
+        except Exception:
+            pass
+
         return {
             "ok": True, "pe": pe, "peg": peg, "profit_margin": profit_margin,
             "revenue_growth": revenue_growth, "earnings_growth": earnings_growth,
-            "roe": roe, "debt_to_equity": debt_to_equity,
+            "roe": roe, "debt_to_equity": debt_to_equity, "sector": sector,
+            "forward_pe": forward_pe, "price_to_sales": price_to_sales,
+            "fcf_yield_pct": fcf_yield_pct, "insiders_pct": insiders,
+            "next_earnings_date": next_earnings_date,
             "fundamental_score": fundamental_score, "fundamental_triggers": triggers,
         }
     except Exception as e:
@@ -762,6 +830,7 @@ def get_aktieguld_data(ticker: str, fundamental: dict) -> dict:
 
         return {
             "ok": aktieguld_score is not None,
+            "reason": None if aktieguld_score is not None else "ingen af de tre faser kunne beregnes (mangler nøgletal)",
             "fase1_score": fase1_score,
             "fase2_score": fase2_score,
             "fase2_forventet_afkast_pct": forventet_afkast_pct,
@@ -774,6 +843,110 @@ def get_aktieguld_data(ticker: str, fundamental: dict) -> dict:
         }
     except Exception as e:
         return {"ok": False, "reason": f"kunne ikke beregne Aktieguld-point: {e}"}
+
+
+# ============================================================================
+# --- Sektor-rotation (info-badge — påvirker IKKE komposit-scoren) ---
+# ============================================================================
+#
+# Tilføjet efter ønske fra bruger (Jacobi, 2026-09-17), afklaret via
+# opklarende spørgsmål: vises KUN som ekstra info/trigger i UI'en, indgår
+# ikke i komposit-scoren eller nogen af de fire vægtede faktorer.
+#
+# Metode (bekræftet af bruger): en sektors "rotation" måles som dens
+# RELATIVE styrke — sektor-ETF'ens kursafkast de seneste ~3 måneder minus
+# verdensindekset (BENCHMARK = ACWI) i samme periode. Positiv = sektoren er
+# "i medvind" (slår markedet), negativ = "i modvind" (halter efter).
+#
+# Bruger har både amerikanske og danske/europæiske aktier. Der findes ingen
+# separate danske sektor-ETF'er, så vi bruger aktiens globale GICS-sektor
+# (Yahoo Finances "sector"-felt, fx "Technology") som proxy og matcher den
+# til den tilsvarende amerikanske sektor-ETF (SPDR Select Sector-serien).
+# Dette er en tilnærmelse — sektor-cyklusser hænger langt fra perfekt sammen
+# på tværs af markeder — men bruger har accepteret dette frem for slet ingen
+# sektor-info for hovedparten af hans aktier.
+
+SECTOR_ETF_MAP = {
+    "Technology": "XLK",
+    "Financial Services": "XLF",
+    "Healthcare": "XLV",
+    "Energy": "XLE",
+    "Industrials": "XLI",
+    "Consumer Cyclical": "XLY",
+    "Consumer Defensive": "XLP",
+    "Utilities": "XLU",
+    "Basic Materials": "XLB",
+    "Real Estate": "XLRE",
+    "Communication Services": "XLC",
+}
+
+SECTOR_ROTATION_LOOKBACK_DAYS = 63   # ~3 måneders handelsdage (bekræftet af bruger)
+SECTOR_ROTATION_THRESHOLD_PCT = 3.0  # +/- procentpoint relativ styrke for "medvind"/"modvind"
+
+
+def _period_return_pct(ticker: str, lookback_days: int):
+    """Kursafkast i procent de seneste `lookback_days` handelsdage. Returnerer
+    None ved manglende/utilstrækkelig historik i stedet for at kaste en fejl
+    — kaldende kode springer så bare den pågældende sektor/ticker over."""
+    df, err = fetch_ticker_df(ticker, period="6mo")
+    if df is None:
+        return None
+    close = df["Close"].dropna()
+    if len(close) < lookback_days + 5:
+        return None
+    last_price = float(close.iloc[-1])
+    prior_price = float(close.iloc[-(lookback_days + 1)])
+    if not prior_price:
+        return None
+    return (last_price / prior_price - 1.0) * 100.0
+
+
+def get_sector_rotation_map(lookback_days: int = SECTOR_ROTATION_LOOKBACK_DAYS) -> dict:
+    """Beregner relativ styrke for alle 11 GICS-sektorer ift. verdensindekset
+    ÉN GANG (ikke pr. aktie) — kaldende lag (app.py) bør cache resultatet
+    (fx 1 times TTL), da 3-måneders sektorafkast ikke ændrer sig fra
+    minut til minut. Bruges kun til info-badges, se get_sector_signal()."""
+    benchmark_return = _period_return_pct(BENCHMARK, lookback_days)
+    result = {"ok": benchmark_return is not None, "benchmark_return_pct": benchmark_return, "sectors": {}}
+    if benchmark_return is None:
+        return result
+    for sector_name, etf in SECTOR_ETF_MAP.items():
+        etf_return = _period_return_pct(etf, lookback_days)
+        if etf_return is None:
+            continue
+        result["sectors"][sector_name] = {
+            "etf": etf,
+            "etf_return_pct": etf_return,
+            "relative_strength_pct": etf_return - benchmark_return,
+        }
+    return result
+
+
+def get_sector_signal(sector_name, sector_map: dict):
+    """Slår en akties GICS-sektor op i det forudberegnede sector_map og
+    klassificerer den som medvind/modvind/neutral. Returnerer None hvis
+    sektoren er ukendt eller data mangler — UI'en udelader så bare badge'en
+    i stedet for at vise en fejl (samme princip som Aktieguld-fallback)."""
+    if not sector_name or not sector_map or not sector_map.get("ok"):
+        return None
+    info = sector_map.get("sectors", {}).get(sector_name)
+    if not info:
+        return None
+    rs = info["relative_strength_pct"]
+    if rs >= SECTOR_ROTATION_THRESHOLD_PCT:
+        retning = "medvind"
+    elif rs <= -SECTOR_ROTATION_THRESHOLD_PCT:
+        retning = "modvind"
+    else:
+        retning = "neutral"
+    return {
+        "sector": sector_name,
+        "etf": info["etf"],
+        "relative_strength_pct": rs,
+        "etf_return_pct": info["etf_return_pct"],
+        "benchmark_return_pct": sector_map.get("benchmark_return_pct"),
+        "retning": retning,
+    }
 
 
 def get_stocktwits_data(ticker):

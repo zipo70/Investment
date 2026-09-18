@@ -46,6 +46,8 @@ from core import (
     get_ticker_meta as _get_ticker_meta_impl,
     analyze_ticker as _analyze_ticker_impl,
     find_top_candidates as _find_top_candidates_impl,
+    get_sector_rotation_map as _get_sector_rotation_map_impl,
+    get_sector_signal,
 )
 
 
@@ -84,6 +86,32 @@ def _render_aktieguld(aktieguld: dict):
     linjer.extend(aktieguld.get("aktieguld_triggers") or [])
     st.markdown("\n".join(f"- {l}" for l in linjer) if linjer else "*Ingen delresultater*")
     st.caption(f"Samlet Aktieguld-score: {aktieguld['aktieguld_score']:.0f}/100 (vægter 20% i komposit-scoren)")
+
+
+def _render_sector_signal(sector: str):
+    """Info-badge om sektor-rotation — påvirker IKKE komposit-scoren (se
+    core.py:get_sector_signal for metode/forbehold). Udelades helt hvis
+    aktiens sektor er ukendt eller ETF-data mangler, i stedet for at vise en
+    fejl for noget der bevidst er "best effort"."""
+    signal = get_sector_signal(sector, get_sector_rotation_map())
+    if not signal:
+        return
+    ikon = {"medvind": "🟢", "modvind": "🔴", "neutral": "⚪"}[signal["retning"]]
+    st.caption(
+        f"{ikon} Sektor ({signal['sector']}): {signal['retning']} "
+        f"({signal['relative_strength_pct']:+.1f} procentpoint vs. verdensmarkedet, seneste 3 mdr.) "
+        f"— info, indgår ikke i scoren"
+    )
+
+
+def _render_next_earnings(fundamental: dict):
+    """Ren info-linje om næste regnskabsdato — IKKE et forsøg på at vise
+    specifikke begivenheder/katalysatorer (fx FDA-godkendelser eller fase
+    3-udlæsninger, jf. bruger, Genmab-eksempel 2026-09-18): den slags findes
+    ikke gratis via Yahoo Finance. Indgår ikke i nogen score."""
+    dato = (fundamental or {}).get("next_earnings_date")
+    if dato:
+        st.caption(f"📅 Næste regnskabsmeddelelse: {dato} — info, indgår ikke i scoren")
 
 
 def _top10_technical_sort_key(c):
@@ -152,6 +180,14 @@ def analyze_ticker(ticker: str):
 def find_top_candidates(top_n: int = 10):
     """Cachet 30 min."""
     return _find_top_candidates_impl(top_n)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_sector_rotation_map():
+    """Cachet 1 time — beregnes kun ÉN gang pr. time uanset hvor mange
+    aktier der analyseres i mellemtiden (se core.py:get_sector_rotation_map).
+    Info-badge, indgår ikke i komposit-scoren."""
+    return _get_sector_rotation_map_impl()
 
 
 # ============================================================================
@@ -324,6 +360,8 @@ with tab_watch:
                         elif fa.get("ok") is False:
                             st.caption(f"Fundamentale nøgletal: ingen data ({fa.get('reason', '?')})")
                         _render_aktieguld(result.get("aktieguld", {}))
+                        _render_sector_signal(fa.get("sector"))
+                        _render_next_earnings(fa)
                         a = result["analyst"]
                         if a.get("ok") and a.get("recommendation_key"):
                             st.markdown(f"**🎯 Analytiker-anbefaling:** {a['recommendation_key']} "
@@ -441,6 +479,8 @@ with tab_top10:
                     elif fa.get("ok") is False:
                         st.caption(f"Fundamentale nøgletal: ingen data ({fa.get('reason', '?')})")
                     _render_aktieguld(c.get("aktieguld", {}))
+                    _render_sector_signal(fa.get("sector"))
+                    _render_next_earnings(fa)
                     a = c["analyst"]
                     if a.get("ok") and a.get("recommendation_key"):
                         st.markdown(f"**🎯 Analytiker-anbefaling:** {a['recommendation_key']} "
