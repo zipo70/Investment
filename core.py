@@ -21,6 +21,7 @@ import datetime
 
 import numpy as np
 import pandas as pd
+from scipy.signal import find_peaks
 
 
 # ============================================================================
@@ -71,6 +72,46 @@ class Config:
                                          # mere end 10% tab fra indgangskursen, uanset
                                          # hvor dybt det tekniske niveau (bund/SMA50)
                                          # ellers ligger (jf. bruger)
+
+    # --- Kursmønstre (tilføjet efter bruger-ønske, 2026-09-18: "golden cross
+    # og cup with handle og sådan noget") — HEURISTISKE tilnærmelser, ikke
+    # akademisk mønstergenkendelse. Se _detect_cup_with_handle m.fl. for de
+    # fulde forbehold. breakout_tolerance_pct/breakdown_tolerance_pct bruges
+    # på tværs af flere mønstre til at afgøre om kursen har brudt/er tæt på
+    # at bryde et niveau.
+    pattern_breakout_tolerance_pct = 2.0
+    pattern_breakdown_tolerance_pct = 2.0
+
+    # Opgraderet 2026-09-18 (jf. bruger: "hvordan gør vi mønstrene robuste")
+    # fra et hjemmelavet rullende min/max-vindue til scipy.signal.find_peaks
+    # med "prominens"-filtrering — den etablerede metode til top/bund-
+    # detektion, der luger støj/mindre vendepunkter fra i stedet for at
+    # flage enhver lokal bump. prominence_frac er andelen af vinduets
+    # høj-lav-spænd en top/bund skal "stikke ud" med for at tælle; min_peak_
+    # distance_days er mindsteafstanden (i handelsdage) mellem to fundne
+    # toppe/bunde (find_peaks' distance-parameter).
+    pattern_prominence_frac = 0.03
+    pattern_min_peak_distance_days = 5
+    triangle_resistance_tolerance_pct = 3.0  # modstandens "top-to-top"-spredning må højst være dette
+
+    cup_window_days = 130               # ~6 måneder — selve "koppen"
+    cup_handle_window_days = 15         # de seneste ~3 uger — "hanken"
+    cup_min_depth_pct = 10.0            # koppen skal være mindst 10% dyb …
+    cup_max_depth_pct = 50.0            # … men højst 50% (ellers er det ikke en sund kop)
+    cup_recovery_min_pct = 90.0         # prisen skal have genvundet mindst 90% af randen før hanken
+    cup_handle_max_depth_pct = 15.0     # hankens tilbagefald må højst være 15% fra hankens top
+
+    double_bottom_window_days = 90
+    double_bottom_min_separation_days = 10   # de to bunde skal ligge mindst så langt fra hinanden
+    double_bottom_tolerance_pct = 5.0        # … men ligge inden for 5% af hinanden i pris
+    double_bottom_min_peak_pct = 10.0        # toppen mellem bundene ("halslinjen") skal være mindst 10% højere
+    double_top_min_dip_pct = 10.0            # bunden mellem toppene ("halslinjen") skal være mindst 10% lavere — spejlvendt double bottom
+
+    triangle_window_days = 60
+
+    head_shoulders_window_days = 90
+    head_shoulders_head_min_pct = 3.0        # "hovedet" skal være mindst 3% højere end skuldrene
+    head_shoulders_shoulder_tolerance_pct = 7.0  # skuldrene skal ligge inden for 7% af hinanden
 
 
 # ============================================================================
@@ -368,6 +409,316 @@ def _recent_event(bool_series, lookback_days):
     return True, (len(bool_series) - 1) - last_idx
 
 
+# ============================================================================
+# --- Kursmønstre (heuristiske tilnærmelser) ---
+# ============================================================================
+#
+# Tilføjet efter bruger-ønske (Jacobi, 2026-09-18): "golden cross og cup with
+# handle og sådan noget". Golden/death cross, 52-ugers breakout/breakdown,
+# RSI/MACD-momentumskift fandtes allerede (se compute_technical_signals) —
+# disse fire er nye. VIGTIGT FORBEHOLD: dette er IKKE akademisk eller
+# software-grade mønstergenkendelse (ingen ML, ingen "prominence"-baseret
+# peak-detection) — det er simple, gennemsigtige geometriske tjek på
+# lukkekurser, dokumenteret herunder. De kan give både falske positiver og
+# falske negativer, ligesom alle de øvrige tekniske triggere i denne fil.
+
+def _detect_cup_with_handle(close: pd.Series, cfg):
+    """Cup-with-handle (William O'Neil/IBD-mønster): et U-formet kursfald og
+    -genopretning (koppen) efterfulgt af et kort, lavt tilbagefald tæt på
+    randen (hanken) og et udbrud over randen.
+
+    Tjek: (1) koppen er 10-50% dyb, (2) bunden ligger nogenlunde midt i
+    kop-vinduet (ikke i den ene ende — sikrer en U-form, ikke bare et fald
+    eller en stigning), (3) prisen har genvundet mindst 90% af randen inden
+    hanken begynder, (4) hanken (de seneste ~3 uger) er et fladt, lavt
+    tilbagefald på højst 15%, (5) seneste kurs er ved/over randen.
+
+    Opgraderet 2026-09-18 (jf. bruger): bunden findes nu som den dybeste
+    PROMINENTE bund (scipy.signal.find_peaks via _find_prominent_extrema) i
+    stedet for et råt minimum — en enkelt-dags flash-dyk kan derfor ikke
+    længere fejlagtigt blive udråbt til koppens bund. Randen findes
+    tilsvarende som den højeste prominente top i hver ende af koppen, med
+    fallback til råt max hvis ingen prominent top findes dér (fx hvis
+    kanten selv er monotont stigende/faldende ind mod midten — så er der
+    ingen "top" i teknisk forstand, og det rå max er allerede det rigtige
+    randniveau)."""
+    total_needed = cfg.cup_window_days + cfg.cup_handle_window_days
+    if len(close) < total_needed:
+        return False, {}
+    cup_segment = close.iloc[-total_needed:-cfg.cup_handle_window_days]
+    handle_segment = close.iloc[-cfg.cup_handle_window_days:]
+    if len(cup_segment) < 20 or len(handle_segment) < 3:
+        return False, {}
+
+    cup_values = cup_segment.values
+    peak_idx, trough_idx = _find_prominent_extrema(cup_values, cfg)
+    if len(trough_idx) == 0:
+        return False, {}
+    bottom_i = int(trough_idx[np.argmin(cup_values[trough_idx])])
+    bottom = float(cup_values[bottom_i])
+
+    edge = max(1, len(cup_values) // 10)
+    left_peaks = peak_idx[peak_idx < edge]
+    right_peaks = peak_idx[peak_idx >= len(cup_values) - edge]
+    left_rim = float(cup_values[left_peaks].max()) if len(left_peaks) else float(cup_values[:edge].max())
+    right_rim = float(cup_values[right_peaks].max()) if len(right_peaks) else float(cup_values[-edge:].max())
+    rim = max(left_rim, right_rim)
+    if rim <= 0:
+        return False, {}
+
+    depth_pct = (rim - bottom) / rim * 100.0
+    if not (cfg.cup_min_depth_pct <= depth_pct <= cfg.cup_max_depth_pct):
+        return False, {}
+
+    bottom_pos = bottom_i / len(cup_values)
+    if not (0.2 <= bottom_pos <= 0.8):
+        return False, {}
+
+    if right_rim < rim * (cfg.cup_recovery_min_pct / 100.0):
+        return False, {}
+
+    handle_high = float(handle_segment.max())
+    handle_low = float(handle_segment.min())
+    if handle_high <= 0:
+        return False, {}
+    handle_depth_pct = (handle_high - handle_low) / handle_high * 100.0
+    if handle_depth_pct > cfg.cup_handle_max_depth_pct:
+        return False, {}
+
+    last_price = float(close.iloc[-1])
+    if last_price < rim * (1 - cfg.pattern_breakout_tolerance_pct / 100.0):
+        return False, {}
+
+    return True, {"rim": rim, "bottom": bottom, "depth_pct": depth_pct}
+
+
+def _find_prominent_extrema(values: np.ndarray, cfg, distance=None):
+    """Fælles hjælper: finder lokale toppe og bunde med
+    scipy.signal.find_peaks, prominens-filtreret ift. vinduets eget
+    høj-lav-spænd (så tærsklen automatisk skalerer til aktiens kursniveau/
+    volatilitet i stedet for et fast kronebeløb). Erstatter (2026-09-18, jf.
+    bruger: "hvordan gør vi mønstrene robuste") det tidligere hjemmelavede
+    rullende min/max-vindue, som gav falske/duplikerede toppe ved fladt-
+    liggende punkter under test. Returnerer (peak_idx, trough_idx) som
+    heltals-indeks ind i `values`."""
+    price_range = float(values.max() - values.min())
+    if price_range <= 0:
+        return np.array([], dtype=int), np.array([], dtype=int)
+    prominence = price_range * cfg.pattern_prominence_frac
+    d = distance if distance is not None else cfg.pattern_min_peak_distance_days
+    peak_idx, _ = find_peaks(values, distance=d, prominence=prominence)
+    trough_idx, _ = find_peaks(-values, distance=d, prominence=prominence)
+    return peak_idx, trough_idx
+
+
+def _detect_double_bottom(close: pd.Series, cfg):
+    """Double bottom ("W-bund"): to bunde på nogenlunde samme niveau adskilt
+    af en mellemliggende top (halslinjen), efterfulgt af et udbrud over
+    halslinjen. Bundene findes med scipy.signal.find_peaks (prominens-
+    filtreret, se _find_prominent_extrema) i stedet for et rullende
+    min/max-vindue."""
+    window = close.tail(cfg.double_bottom_window_days)
+    if len(window) < 40:
+        return False, {}
+    values = window.values
+    _, trough_idx = _find_prominent_extrema(values, cfg, distance=cfg.double_bottom_min_separation_days)
+    if len(trough_idx) < 2:
+        return False, {}
+
+    # De to dybeste fundne bunde, i kronologisk rækkefølge
+    two_deepest = sorted(trough_idx, key=lambda i: values[i])[:2]
+    idx1, idx2 = sorted(two_deepest)
+    low1, low2 = float(values[idx1]), float(values[idx2])
+    if max(low1, low2) <= 0 or abs(low1 - low2) / max(low1, low2) * 100.0 > cfg.double_bottom_tolerance_pct:
+        return False, {}
+
+    between = values[idx1:idx2 + 1]
+    if len(between) == 0:
+        return False, {}
+    neckline = float(between.max())
+    avg_low = (low1 + low2) / 2.0
+    if avg_low <= 0 or (neckline - avg_low) / avg_low * 100.0 < cfg.double_bottom_min_peak_pct:
+        return False, {}
+
+    last_price = float(values[-1])
+    if last_price < neckline * (1 - cfg.pattern_breakout_tolerance_pct / 100.0):
+        return False, {}
+
+    return True, {"low1": low1, "low2": low2, "neckline": neckline}
+
+
+def _detect_ascending_triangle(close: pd.Series, cfg):
+    """Ascending triangle: en nogenlunde flad modstand foroven mod en
+    stigende bundlinje, efterfulgt af et udbrud over modstanden. Toppe/bunde
+    findes med scipy.signal.find_peaks; modstanden kræver at de højeste
+    fundne toppe ligger tæt på hinanden, og den stigende bundlinje bekræftes
+    med en lineær regression (hældning > 0) på de fundne bunde — mere
+    robust end den tidligere faste "del i tre lige store dele"-opdeling,
+    som kunne ramme skævt hvis mønsteret ikke fordelte sig jævnt."""
+    window = close.tail(cfg.triangle_window_days)
+    if len(window) < 30:
+        return False, {}
+    values = window.values
+    peak_idx, trough_idx = _find_prominent_extrema(values, cfg)
+    if len(peak_idx) < 2 or len(trough_idx) < 2:
+        return False, {}
+
+    resistance = float(values[peak_idx].max())
+    if resistance <= 0:
+        return False, {}
+    top_two_peaks = np.sort(values[peak_idx])[-2:]
+    if (top_two_peaks.max() - top_two_peaks.min()) / top_two_peaks.max() * 100.0 > cfg.triangle_resistance_tolerance_pct:
+        return False, {}
+
+    slope = float(np.polyfit(trough_idx, values[trough_idx], 1)[0])
+    if slope <= 0:
+        return False, {}
+
+    last_price = float(values[-1])
+    if last_price < resistance * (1 - cfg.pattern_breakout_tolerance_pct / 100.0):
+        return False, {}
+
+    return True, {"resistance": resistance, "slope": slope}
+
+
+def _detect_head_and_shoulders(close: pd.Series, cfg):
+    """Head & shoulders (bearish vendingsmønster): venstre skulder — hoved
+    (klart højere) — højre skulder (nogenlunde samme højde som venstre),
+    efterfulgt af et brud under halslinjen (gennemsnittet af de to
+    bundpunkter mellem toppene). Symmetrisk sælgs-modpart til
+    købsmønstrene ovenfor. Toppene findes med scipy.signal.find_peaks —
+    `distance`-parameteren håndterer automatisk at nærtliggende gentagelser
+    af samme top ikke tælles som separate skuldre/hoved (tidligere en
+    manuel efter-filtrering)."""
+    window = close.tail(cfg.head_shoulders_window_days)
+    if len(window) < 40:
+        return False, {}
+    values = window.values
+    peak_idx, _ = _find_prominent_extrema(values, cfg)
+    if len(peak_idx) < 3:
+        return False, {}
+
+    last_three_idx = peak_idx[-3:]
+    left, head, right = (float(values[i]) for i in last_three_idx)
+    head_min_mult = 1 + cfg.head_shoulders_head_min_pct / 100.0
+    if not (head > left * head_min_mult and head > right * head_min_mult):
+        return False, {}
+    if max(left, right) <= 0 or abs(left - right) / max(left, right) * 100.0 > cfg.head_shoulders_shoulder_tolerance_pct:
+        return False, {}
+
+    left_i, head_i, right_i = last_three_idx
+    trough1 = float(values[left_i:head_i + 1].min())
+    trough2 = float(values[head_i:right_i + 1].min())
+    neckline = (trough1 + trough2) / 2.0
+
+    last_price = float(values[-1])
+    if last_price > neckline * (1 + cfg.pattern_breakdown_tolerance_pct / 100.0):
+        return False, {}
+
+    return True, {"left": left, "head": head, "right": right, "neckline": neckline}
+
+
+# --- Spejlvendte mønstre (tilføjet 2026-09-18, jf. bruger: "findes der
+# andre mønstre der kan anbefales") — genbruger samme scipy-baserede
+# metode (_find_prominent_extrema) som originalerne ovenfor, blot med
+# toppe/bunde og køb/sælg-retning byttet om. ---
+
+def _detect_double_top(close: pd.Series, cfg):
+    """Double top ("M-top", bearish spejlbillede af double bottom): to
+    toppe på nogenlunde samme niveau adskilt af en mellemliggende bund
+    (halslinjen), efterfulgt af et brud under halslinjen."""
+    window = close.tail(cfg.double_bottom_window_days)
+    if len(window) < 40:
+        return False, {}
+    values = window.values
+    peak_idx, _ = _find_prominent_extrema(values, cfg, distance=cfg.double_bottom_min_separation_days)
+    if len(peak_idx) < 2:
+        return False, {}
+
+    two_highest = sorted(peak_idx, key=lambda i: -values[i])[:2]
+    idx1, idx2 = sorted(two_highest)
+    high1, high2 = float(values[idx1]), float(values[idx2])
+    if max(high1, high2) <= 0 or abs(high1 - high2) / max(high1, high2) * 100.0 > cfg.double_bottom_tolerance_pct:
+        return False, {}
+
+    between = values[idx1:idx2 + 1]
+    if len(between) == 0:
+        return False, {}
+    neckline = float(between.min())
+    avg_high = (high1 + high2) / 2.0
+    if avg_high <= 0 or (avg_high - neckline) / avg_high * 100.0 < cfg.double_top_min_dip_pct:
+        return False, {}
+
+    last_price = float(values[-1])
+    if last_price > neckline * (1 + cfg.pattern_breakdown_tolerance_pct / 100.0):
+        return False, {}
+
+    return True, {"high1": high1, "high2": high2, "neckline": neckline}
+
+
+def _detect_descending_triangle(close: pd.Series, cfg):
+    """Descending triangle (bearish spejlbillede af ascending triangle): en
+    nogenlunde flad støtte forneden mod en faldende modstand foroven,
+    efterfulgt af et brud under støtten."""
+    window = close.tail(cfg.triangle_window_days)
+    if len(window) < 30:
+        return False, {}
+    values = window.values
+    peak_idx, trough_idx = _find_prominent_extrema(values, cfg)
+    if len(peak_idx) < 2 or len(trough_idx) < 2:
+        return False, {}
+
+    support = float(values[trough_idx].min())
+    if support <= 0:
+        return False, {}
+    bottom_two_troughs = np.sort(values[trough_idx])[:2]
+    if (bottom_two_troughs.max() - bottom_two_troughs.min()) / bottom_two_troughs.max() * 100.0 > cfg.triangle_resistance_tolerance_pct:
+        return False, {}
+
+    slope = float(np.polyfit(peak_idx, values[peak_idx], 1)[0])
+    if slope >= 0:
+        return False, {}
+
+    last_price = float(values[-1])
+    if last_price > support * (1 + cfg.pattern_breakdown_tolerance_pct / 100.0):
+        return False, {}
+
+    return True, {"support": support, "slope": slope}
+
+
+def _detect_inverse_head_and_shoulders(close: pd.Series, cfg):
+    """Inverse head & shoulders (bullish spejlbillede af head & shoulders):
+    venstre skulder — hoved (klart dybere bund) — højre skulder (nogenlunde
+    samme dybde som venstre), efterfulgt af et udbrud over halslinjen
+    (gennemsnittet af de to toppunkter mellem bundene)."""
+    window = close.tail(cfg.head_shoulders_window_days)
+    if len(window) < 40:
+        return False, {}
+    values = window.values
+    _, trough_idx = _find_prominent_extrema(values, cfg)
+    if len(trough_idx) < 3:
+        return False, {}
+
+    last_three_idx = trough_idx[-3:]
+    left, head, right = (float(values[i]) for i in last_three_idx)
+    head_min_mult = 1 + cfg.head_shoulders_head_min_pct / 100.0
+    if not (left > head * head_min_mult and right > head * head_min_mult):
+        return False, {}
+    if max(left, right) <= 0 or abs(left - right) / max(left, right) * 100.0 > cfg.head_shoulders_shoulder_tolerance_pct:
+        return False, {}
+
+    left_i, head_i, right_i = last_three_idx
+    peak1 = float(values[left_i:head_i + 1].max())
+    peak2 = float(values[head_i:right_i + 1].max())
+    neckline = (peak1 + peak2) / 2.0
+
+    last_price = float(values[-1])
+    if last_price < neckline * (1 - cfg.pattern_breakout_tolerance_pct / 100.0):
+        return False, {}
+
+    return True, {"left": left, "head": head, "right": right, "neckline": neckline}
+
+
 def compute_technical_signals(df, cfg):
     close = df["Close"].dropna()
     volume = df["Volume"].dropna() if "Volume" in df.columns else pd.Series(dtype=float)
@@ -411,6 +762,19 @@ def compute_technical_signals(df, cfg):
     vol_ratio = (last_vol / last_avg_vol) if last_avg_vol and not np.isnan(last_avg_vol) and last_avg_vol > 0 else float("nan")
     vol_spike = bool(vol_ratio and not np.isnan(vol_ratio) and vol_ratio >= cfg.volume_spike_threshold)
 
+    # Kursmønstre (se _detect_*-funktionerne ovenfor for metode/forbehold) —
+    # ligesom golden cross/breakout/momentum tælles de kun med når trend_ok
+    # (pris over 200-dages snit), konsistent med app'ens trend-følgende
+    # filosofi: mønstre tæller kun som købssignal i en allerede etableret
+    # opadgående trend, ikke som forsøg på at "fange en kniv" i en nedtrend.
+    cup_hit, cup_info = _detect_cup_with_handle(close, cfg)
+    double_bottom_hit, double_bottom_info = _detect_double_bottom(close, cfg)
+    triangle_hit, triangle_info = _detect_ascending_triangle(close, cfg)
+    head_shoulders_hit, head_shoulders_info = _detect_head_and_shoulders(close, cfg)
+    inv_head_shoulders_hit, inv_head_shoulders_info = _detect_inverse_head_and_shoulders(close, cfg)
+    double_top_hit, double_top_info = _detect_double_top(close, cfg)
+    desc_triangle_hit, desc_triangle_info = _detect_descending_triangle(close, cfg)
+
     # --- Købs-triggere ---
     triggers, score = [], 0
     if trend_ok:
@@ -425,6 +789,18 @@ def compute_technical_signals(df, cfg):
             triggers.append(f"{src} for {(rsi_days_ago if rsi_hit else macd_days_ago)} dage siden")
         if vol_spike:
             score += 5; triggers.append(f"Volumenspike ({vol_ratio:.1f}x snit)")
+        if cup_hit:
+            score += 20
+            triggers.append(f"Cup-with-handle-mønster, {cup_info['depth_pct']:.0f}% dyb kop, tæt på/over randen")
+        if double_bottom_hit:
+            score += 15
+            triggers.append("Double bottom (\"W-bund\") bekræftet over halslinjen")
+        if triangle_hit:
+            score += 10
+            triggers.append(f"Ascending triangle — udbrud over modstand ({triangle_info['resistance']:.2f})")
+        if inv_head_shoulders_hit:
+            score += 25
+            triggers.append("Inverse head & shoulders-mønster bekræftet over halslinjen")
     else:
         triggers.append("Under 200-dages glidende gennemsnit")
         if death_hit:
@@ -435,6 +811,15 @@ def compute_technical_signals(df, cfg):
     if not trend_ok:
         sell_score += 30
         sell_triggers.append("Kurs under 200-dages glidende gennemsnit")
+    if head_shoulders_hit:
+        sell_score += 25
+        sell_triggers.append("Head & shoulders-mønster bekræftet under halslinjen")
+    if double_top_hit:
+        sell_score += 15
+        sell_triggers.append("Double top (\"M-top\") bekræftet under halslinjen")
+    if desc_triangle_hit:
+        sell_score += 10
+        sell_triggers.append(f"Descending triangle — brud under støtte ({desc_triangle_info['support']:.2f})")
     if death_hit:
         sell_score += 30
         sell_triggers.append(f"Death cross for {death_days_ago} dage siden")

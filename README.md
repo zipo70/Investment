@@ -221,9 +221,12 @@ kort pr. aktie med kurs, dags-ændring, en mini-graf og en komposit-rating
 popularitet 45% — nedskaleret proportionalt da Aktieguld blev tilføjet som
 4. faktor, jf. bruger, 2026-09):
 - **Teknisk (24%)**: kort bane (dage/uger — golden/death cross, 52-ugers
-  breakout, RSI/MACD-momentumskift, volumenspike) vægtet 60%, og lang bane
-  (måneder/år — 12-måneders prismomentum, nærhed til flerårs-højeste,
-  baseret på 5 års historik) vægtet 40%.
+  breakout, RSI/MACD-momentumskift, volumenspike, og — tilføjet efter
+  bruger-ønske, 2026-09-18 — cup-with-handle, double bottom og ascending
+  triangle som købsmønstre samt head & shoulders som sælgsmønster, se
+  forbehold nedenfor) vægtet 60%, og lang bane (måneder/år — 12-måneders
+  prismomentum, nærhed til flerårs-højeste, baseret på 5 års historik)
+  vægtet 40%.
 - **Fundamental (20%)**: rigtige regnskabstal fra Yahoo Finance (P/E, PEG,
   overskudsgrad, omsætnings-/indtjeningsvækst, egenkapitalforrentning,
   gæld/egenkapital, og — tilføjet efter bruger-ønske, Genmab-eksempel,
@@ -312,6 +315,84 @@ sektor (ukendt hos Yahoo) eller kunne ETF-dataene ikke hentes, udelades
 badge'en helt i stedet for at vise et misvisende tal. Sektor-kortet
 genberegnes højst hvert 1. time (cachet), da 3-måneders afkast alligevel
 ikke ændrer sig fra minut til minut.
+
+### Kursmønstre — cup-with-handle, double top/bottom, triangler, head & shoulders
+
+Efter bruger-ønske ("golden cross og cup with handle og sådan noget",
+2026-09-18) er der tilføjet syv nye kursmønstre til den tekniske analyse,
+oven i de eksisterende (golden/death cross, 52-ugers breakout/breakdown,
+RSI/MACD-momentumskift). De tæller med i `ta_score` (teknisk-faktoren,
+24% af komposit-scoren) på samme måde som de eksisterende — se
+`core.py:_detect_cup_with_handle` m.fl. for den fulde, kommenterede logik.
+De sidste tre (double top, descending triangle, inverse head & shoulders)
+er tilføjet som "spejlvendte" modparter til de tre første, efter bruger
+spurgte om flere anbefalede mønstre til de allerede brugte:
+
+**Købsmønstre** (tæller kun med når aktien handler over sit 200-dages
+snit, `trend_ok` — konsistent med app'ens trend-følgende filosofi):
+- **Cup-with-handle** (+20 point): et U-formet kursfald/-genopretning
+  ("koppen", 10-50% dyb over ~6 måneder) efterfulgt af et kort, lavt
+  tilbagefald tæt på randen ("hanken", ~3 uger) og et udbrud over randen.
+- **Double bottom / "W-bund"** (+15 point): to bunde på nogenlunde samme
+  niveau adskilt af en mellemliggende top, efterfulgt af udbrud over toppen
+  ("halslinjen").
+- **Ascending triangle** (+10 point): en flad modstand mod en stigende
+  bundlinje, efterfulgt af udbrud over modstanden.
+- **Inverse head & shoulders** (+25 point): venstre skulder — dybere
+  hoved — højre skulder i nogenlunde samme dybde som venstre, efterfulgt af
+  et udbrud over halslinjen mellem toppunkterne.
+
+**Sælgsmønstre** (tæller altid med, som de øvrige sælgs-triggere,
+uanset trend-status):
+- **Head & shoulders** (+25 point): venstre skulder — højere hoved —
+  højre skulder i nogenlunde samme højde som venstre, efterfulgt af brud
+  under halslinjen mellem toppene.
+- **Double top / "M-top"** (+15 point): to toppe på nogenlunde samme
+  niveau adskilt af en mellemliggende bund, efterfulgt af brud under bunden
+  ("halslinjen").
+- **Descending triangle** (+10 point): en flad støtte forneden mod en
+  faldende modstand, efterfulgt af brud under støtten.
+
+**Robusthed — opgraderet 2026-09-18** (jf. bruger: "hvordan gør vi
+mønstrene robuste, findes der et lib?"): toppe/bunde findes nu med
+`scipy.signal.find_peaks` (prominens- og minimumsafstand-filtreret, se
+`core.py:_find_prominent_extrema`) i stedet for det oprindelige
+hjemmelavede rullende min/max-vindue, som under test viste sig at kunne
+flage falske/duplikerede toppe ved fladt-liggende punkter. Prominensen
+skalerer automatisk med aktiens eget kursspænd (`pattern_prominence_frac`,
+default 3% af vinduets høj-lav-spænd), så tærsklen ikke er et fast
+kronebeløb. Ascending/descending triangle bruger nu også en rigtig lineær
+regression på de fundne bunde/toppe (kræver hældning i den rigtige retning)
+i stedet for en fast "del i tre lige store dele"-opdeling. Cup-with-handle
+er også opgraderet: bunden findes som den dybeste PROMINENTE bund (ikke
+længere et råt minimum, som en enkelt-dags flash-dyk kunne snyde), og
+randen findes som den højeste prominente top i hver ende af koppen (med
+fallback til råt max hvis kanten selv er monotont stigende/faldende, hvor
+der teknisk set ikke findes en "top").
+
+Undersøgt og bevidst fravalgt: eksisterende Python-biblioteker til
+kursmønster-genkendelse blev tjekket (bl.a. [tradingpattern på
+PyPI](https://pypi.org/project/tradingpattern) og
+[PatternPy](https://github.com/keithorange/PatternPy)) — ingen af dem
+dækker cup-with-handle (for specifik/gammeldags IBD-figur), og
+`tradingpattern`s egen H&S/triangel-logik viste sig ved kildekode-gennemsyn
+at bruge et endnu simplere 3-dages rullende vindue UDEN prominens-
+filtrering — altså svagere end vores egen (nu scipy-baserede) løsning, så
+det gav ikke mening at tilføje som afhængighed. TA-Lib blev også fravalgt —
+det dækker kun candlestick-mønstre (doji, hammer, osv.), ikke chart-mønstre
+som disse, og kræver desuden C-kompilering, som er en reel risiko på
+Streamlit Community Cloud.
+
+**Vigtigt forbehold, stadig gældende:** dette er IKKE akademisk eller
+software-grade mønstergenkendelse (ingen maskinlæring) — det er
+gennemsigtige, regelbaserede geometriske tjek (nu på et solidt fundament
+via scipy), som stadig kan give både falske positiver og falske negativer,
+ligesom alle øvrige tekniske triggere i denne fil. Cup-with-handle, double
+bottom og ascending triangle tæller kun med når aktien allerede handler
+over sit 200-dages glidende gennemsnit (`trend_ok`), konsistent med
+app'ens generelle trend-følgende filosofi — de er ikke forsøgt brugt til at
+"fange en kniv" i en nedtrend. Head & shoulders tælles altid med (som de
+øvrige sælgs-triggere), uanset trend-status.
 
 **KØB/HOLD/SÆLG-anbefaling**: ud over komposit-scoren viser hvert kort nu
 også en klar handling. Sælg-signaler er en symmetrisk modpart til de

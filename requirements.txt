@@ -9,6 +9,9 @@
 yfinance
 pandas>=2.0
 numpy>=1.24
+scipy>=1.10             # find_peaks til kursmønster-detektion (cup-with-handle m.fl.,
+                        # se core.py) — ren binær wheel til alle platforme, ingen
+                        # kompiler krævet (i modsætning til fx TA-Lib, bevidst fravalgt)
 requests>=2.28          # StockTwits-opslag (screener.py) — ren Python, ingen kompiler
 streamlit>=1.30         # "Mine Aktier" GUI-app (app.py) — kun nødvendig hvis du deployer appen
 
