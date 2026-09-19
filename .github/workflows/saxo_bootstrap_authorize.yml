@@ -1,0 +1,39 @@
+name: Saxo — første-gangs autorisation (kun via GitHub, ingen telefon-terminal)
+
+on:
+  workflow_dispatch:
+    inputs:
+      code:
+        description: "'code'-værdien fra adresselinjen efter Saxo-login"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installér afhængigheder
+        run: pip install requests pynacl
+
+      - name: Byt code til token og gem som krypteret secret
+        env:
+          SAXO_CLIENT_ID: ${{ secrets.SAXO_CLIENT_ID }}
+          SAXO_CLIENT_SECRET: ${{ secrets.SAXO_CLIENT_SECRET }}
+          SAXO_REDIRECT_URI: ${{ vars.SAXO_REDIRECT_URI || 'http://localhost:12321/callback' }}
+          SAXO_TOKEN_BACKEND: github_secret
+          GH_PAT_FOR_SECRETS: ${{ secrets.GH_PAT_FOR_SECRETS }}
+        run: python -m trading.oauth --exchange-code "${{ inputs.code }}"
+
+      - name: Færdig
+        run: |
+          echo "Token hentet og gemt som det krypterede secret SAXO_TOKENS_JSON."
+          echo "trading_execution.yml kan nu køres."
