@@ -1,0 +1,34 @@
+name: Generér Saxo-signaler
+
+on:
+  schedule:
+    - cron: "15 6 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  generate_signals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installér afhængigheder
+        run: pip install -r requirements.txt
+
+      - name: Kør signal-generering
+        run: python signal_job.py
+
+      - name: Committér opdateret trading.db
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add trading/state/trading.db
+          git diff --cached --quiet && echo "Ingen ændringer at committe." || \
+            git commit -m "signal_job: opdater trading.db [skip ci]"
+          git push
