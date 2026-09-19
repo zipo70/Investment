@@ -20,3 +20,17 @@ streamlit>=1.30         # "Mine Aktier" GUI-app (app.py) — kun nødvendig hvis
 # udelades automatisk (uden fejl) hvis den ikke er installeret eller
 # API-nøgler ikke er sat op — se README.md "Kandidat-screener".
 praw>=7.7
+
+# --- Saxo Bank-integration (trading/, se SAXO_INTEGRATION.md) -----------
+# sqlite3 og dataclasses er indbygget i Python — ingen nye afhængigheder
+# for Lag 1+2 (signal_job.py, trading/decision.py). "requests" ovenfor
+# dækker også Lag 3's OAuth/REST-kald mod Saxo.
+pynacl>=1.5             # kryptering af OAuth-tokens til GitHub Actions-secrets
+                        # (trading/token_store.GitHubSecretTokenStore) — bruges når
+                        # Lag 3 kører helt via GitHub Actions uden VPS, se
+                        # SAXO_INTEGRATION.md, "Hosting via GitHub Actions"
+
+# websocket-client — kun nødvendig HVIS/NÅR du selv færdiggør
+# trading/monitor.py's run_websocket_forever() (kræver en vedvarende VPS,
+# se SAXO_INTEGRATION.md). Afkommentér når den dag kommer:
+# websocket-client>=1.7

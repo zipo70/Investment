@@ -533,6 +533,15 @@ et andet tidspunkt.
   (et par minutter, én gang dagligt, på et privat/lille repo) — ingen
   omkostning at forvente.
 
+## Saxo Bank-integration (automatisk ordreeksekvering, KUN SIM)
+
+Skelet til automatisk ordreafgivelse mod Saxo Banks SIM-miljø
+(paper trading mod en rigtig mæglerkonto-simulator, ingen live-handel) —
+se **[SAXO_INTEGRATION.md](SAXO_INTEGRATION.md)** for arkitektur,
+hosting-anbefaling, opsætning og en ærlig liste over hvad der stadig
+mangler at blive udfyldt/testet mod din egen Saxo-konto, før noget sendes
+for rigtigt (om end kun i SIM).
+
 ## Vigtige begrænsninger — læs før du stoler på tallene
 
 - **Valuta ikke modelleret**: porteføljen blander USD/EUR/DKK/SEK/NOK/CHF/GBP-
@@ -560,8 +569,12 @@ et andet tidspunkt.
    flere kvartaler).
 3. Kun hvis den simulerede performance over tid ser robust ud: overvej
    manuel eksekvering af agentens forslag på Nordnet — dvs. AGENTEN
-   FORESLÅR, DU TRYKKER KØB/SÆLG. Fuldautomatisk ordreafgivelse mod en
-   rigtig konto er bevidst uden for scope her.
+   FORESLÅR, DU TRYKKER KØB/SÆLG.
+4. Et skelet til fuldautomatisk ordreafgivelse mod Saxo Banks SIM-miljø
+   findes nu (se "Saxo Bank-integration" ovenfor og
+   [SAXO_INTEGRATION.md](SAXO_INTEGRATION.md)) — men er bevidst ikke
+   produktionsklart, og live-handel (en rigtig konto, rigtige penge) er
+   fortsat uden for scope indtil du selv aktivt beslutter at gå den vej.
 
 ## Filoversigt
 
@@ -585,5 +598,9 @@ et andet tidspunkt.
 | `alert_check.py` | Automatisk dagligt KØB/SÆLG-tjek, kørt af GitHub Actions — sender push-notifikation/sms |
 | `watchlist_tickers.txt` | Ticker-liste (redigeres på GitHub) som `alert_check.py` tjekker udover Top 10 |
 | `.github/workflows/daily_alert.yml` | GitHub Actions-workflow der kører `alert_check.py` hver hverdagsmorgen |
+| `notify.py` | Fælles notifikations-hjælper (ntfy/Twilio), brugt af både `alert_check.py` og `trading/` |
+| `signal_job.py` | Nyt scheduled job — skriver KØB/SÆLG-signaler til Saxo-integrationens database (se SAXO_INTEGRATION.md) |
+| `trading/` | Saxo Bank-integration — beslutnings- og eksekveringslag, se [SAXO_INTEGRATION.md](SAXO_INTEGRATION.md) for detaljer |
+| `tests/test_decision.py` | Netværksfrie unit-tests af beslutningslaget (`trading/decision.py`) |
 
 Kun til eget analysebrug — ikke finansiel rådgivning.

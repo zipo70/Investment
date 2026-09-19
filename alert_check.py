@@ -30,61 +30,8 @@ Notifikationsmetode (se README.md, "Automatisk dagligt tjek" for opsætning):
   (synligt under "Actions" på GitHub) uden fejl.
 """
 
-import os
-import sys
-
-import requests
-
 from core import analyze_ticker, find_top_candidates, load_static_watchlist
-
-
-def send_notification(title: str, body: str) -> bool:
-    account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
-    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
-    from_number = os.environ.get("TWILIO_FROM_NUMBER")
-    to_number = os.environ.get("TWILIO_TO_NUMBER")
-    if account_sid and auth_token and from_number and to_number:
-        try:
-            resp = requests.post(
-                f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json",
-                data={"From": from_number, "To": to_number, "Body": f"{title}\n{body}"},
-                auth=(account_sid, auth_token),
-                timeout=15,
-            )
-            if resp.status_code >= 300:
-                print(f"Twilio-fejl (HTTP {resp.status_code}): {resp.text}", file=sys.stderr)
-                return False
-            print("Notifikation sendt via Twilio (rigtig SMS).")
-            return True
-        except Exception as e:
-            print(f"Twilio-undtagelse: {e}", file=sys.stderr)
-            return False
-
-    topic = os.environ.get("NTFY_TOPIC")
-    if topic:
-        try:
-            resp = requests.post(
-                f"https://ntfy.sh/{topic}",
-                data=body.encode("utf-8"),
-                headers={
-                    "Title": title.encode("utf-8"),
-                    "Priority": "high",
-                    "Tags": "chart_with_upwards_trend",
-                },
-                timeout=15,
-            )
-            if resp.status_code >= 300:
-                print(f"ntfy-fejl (HTTP {resp.status_code}): {resp.text}", file=sys.stderr)
-                return False
-            print("Notifikation sendt via ntfy.sh (gratis push).")
-            return True
-        except Exception as e:
-            print(f"ntfy-undtagelse: {e}", file=sys.stderr)
-            return False
-
-    print("Ingen notifikationsmetode sat op (hverken Twilio- eller NTFY_TOPIC-secrets fundet).")
-    print(f"--- {title} ---\n{body}")
-    return False
+from notify import send_notification  # udtrukket 2026-09-19, se notify.py
 
 
 def main():
