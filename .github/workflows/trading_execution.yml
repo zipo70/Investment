@@ -32,7 +32,7 @@ jobs:
           GH_PAT_FOR_SECRETS: ${{ secrets.GH_PAT_FOR_SECRETS }}
           SAXO_DRY_RUN: ${{ vars.SAXO_DRY_RUN || 'true' }}
           SAXO_MAX_ORDER_AMOUNT: ${{ vars.SAXO_MAX_ORDER_AMOUNT || '7000' }}  # EUR; 20 % af 33.500 = 6.700
-          SAXO_MAX_ORDERS_PER_DAY: ${{ vars.SAXO_MAX_ORDERS_PER_DAY || '5' }}
+          SAXO_MAX_ORDERS_PER_DAY: ${{ vars.SAXO_MAX_ORDERS_PER_DAY || '1' }}  # første test: maks 1 ordre pr. dag
           SAXO_STRATEGY_CAPITAL: ${{ vars.SAXO_STRATEGY_CAPITAL || '33500' }}  # ca. 250.000 kr. (kontoen er i EUR) — så én plads (~50.000 kr.) rækker til 2 Mærsk-aktier
           SAXO_SIGNAL_MAX_AGE_HOURS: ${{ vars.SAXO_SIGNAL_MAX_AGE_HOURS || '36' }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
