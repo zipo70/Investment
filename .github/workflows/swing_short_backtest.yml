@@ -1,0 +1,41 @@
+name: Kort swing-backtest
+
+# Kører swing_short_backtest.py (kort swing-variant) og gemmer
+# resultatet i output/. Startes manuelt (Run workflow).
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: swing-short-backtest
+  cancel-in-progress: false
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installér afhængigheder
+        run: pip install -r requirements.txt
+
+      - name: Kør kort swing-backtest
+        run: python swing_short_backtest.py
+
+      - name: Committér resultat
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/swing_short_backtest.json output/swing_short_backtest.md output/swing_short_trades.csv
+          git diff --cached --quiet && echo "Ingen ændringer." && exit 0
+          git commit -m "swing_short_backtest: opdater resultat [skip ci]"
+          for i in 1 2 3; do git pull --rebase && git push && exit 0; sleep 5; done
+          exit 1
