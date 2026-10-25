@@ -1,18 +1,20 @@
-# Top 10 — 2026-10-25 12:20 UTC
+# Top 10 — 2026-10-25 14:21 UTC
 
-Univers: 79 · data-fejl: 1 · uden optrend: 30 · shortlist: 20
+Univers: 79 · data-fejl: 1 · uden optrend: 29 · shortlist: 10
 
-| # | Ticker | Navn | Anb. | Komposit | GEICO | Upside | Kurs | Stop | Regnskab |
+Model A · næste rebalancering: 2026-10-26 · i dag rebalanceringsdag: False
+
+| # | Ticker | Navn | Model A | Momentum 6-1 | Komposit (info) | GEICO | Kurs | Stop −15 % | Regnskab |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | TTE.PA | TOTALENERGIES | KØB | 85.1 | 73.2 | 5.6% | 83.45 | 75.1 (-10.0%) | 2026-10-29 |
-| 2 | CVX | Chevron Corporation | KØB | 84.1 | 62.3 | -0.3% | 233.21 | 209.89 (-10.0%) | 2026-10-30 |
-| 3 | MA | Mastercard Incorporated | KØB | 83.0 | 47.4 | 8.4% | 623.6 | 561.24 (-10.0%) | 2026-10-29 |
-| 4 | PBR | Petroleo Brasileiro S.A. Petrob | KØB | 82.8 | 67.0 | -8.5% | 26.16 | 23.54 (-10.0%) | 2026-11-10 |
-| 5 | V | Visa Inc. | KØB | 80.8 | 51.6 | 4.3% | 407.92 | 367.13 (-10.0%) | 2026-10-27 |
-| 6 | KO | Coca-Cola Company (The) | KØB | 78.6 | 58.3 | 2.8% | 92.71 | 84.28 (-9.1%) | 2026-10-27 |
-| 7 | ITUB | Itau Unibanco Banco Holding SA | KØB | 76.9 | 60.6 | -6.7% | 9.67 | 8.7 (-10.0%) | 2026-11-03 |
-| 8 | SHEL.L | SHELL PLC ORD EUR0.07 | KØB | 76.8 | 62.8 | -0.6% | 4033.0 | 3629.7 (-10.0%) | 2026-10-29 |
-| 9 | AAPL | Apple Inc. | KØB | 75.9 | 50.6 | -5.3% | 347.73 | 322.55 (-7.2%) | 2026-11-02 |
-| 10 | XOM | ExxonMobil Holdings Corporation | KØB | 74.6 | 53.1 | -2.1% | 183.21 | 164.89 (-10.0%) | 2026-10-30 |
+| 1 | MAERSK-B.CO | A.P. Møller - Mærsk B A/S | KØB | 61.8% | 49.8 | 62.8 | 22870.0 | 19439.5 (-15.0%) | 2026-11-05 |
+| 2 | INTC | Intel Corporation | KØB | 54.3% | 54.2 | 57.5 | 86.96 | 73.92 (-15.0%) | 2026-10-29 |
+| 3 | CRM | Salesforce, Inc. | KØB | 34.3% | 72.4 | 63.3 | 248.57 | 211.28 (-15.0%) | 2026-12-02 |
+| 4 | GMAB.CO | Genmab A/S | KØB | 32.6% | 67.7 | 56.5 | 2644.0 | 2247.4 (-15.0%) | 2026-11-05 |
+| 5 | SAP.DE | SAP SE                        I | KØB | 28.4% | 70.3 | 75.5 | 214.4 | 182.24 (-15.0%) | 2026-10-21 |
+| 6 | ASML.AS | ASML HOLDING | HOLD | 26.2% | 75.6 | 58.6 | 1407.2 | 1196.12 (-15.0%) | 2026-10-14 |
+| 7 | AAPL | Apple Inc. | HOLD | 24.1% | 75.9 | 50.6 | 347.73 | 295.57 (-15.0%) | 2026-11-02 |
+| 8 | CSCO | Cisco Systems, Inc. | HOLD | 20.6% | 71.4 | 56.9 | 106.5 | 90.52 (-15.0%) | 2026-11-12 |
+| 9 | JNJ | Johnson & Johnson | HOLD | 20.3% | 58.4 | 48.0 | 263.81 | 224.24 (-15.0%) | 2026-10-13 |
+| 10 | V | Visa Inc. | HOLD | 19.4% | 80.8 | 51.6 | 407.92 | 346.73 (-15.0%) | 2026-10-27 |
 
 Research-værktøj, ikke finansiel rådgivning.
