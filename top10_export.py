@@ -39,6 +39,8 @@ def _row(c: dict) -> dict:
     meta = c.get("meta") or {}
     return {
         "ticker": c["ticker"],
+        "model_a_rank": (c.get("model_a") or {}).get("rank"),
+        "momentum_6_1_pct": _num(((c.get("model_a") or {}).get("momentum") or float("nan")) * 100),
         "navn": c.get("short_name"),
         "region": c.get("region"),
         "valuta": meta.get("currency"),
@@ -89,13 +91,16 @@ def main():
         f"uden optrend: {stats.get('skipped_trend')} · shortlist: {stats.get('shortlist_size')}"
         + (" · ⚠️ mange data-fejl (rate-limit?)" if stats.get("high_skip_rate") else ""),
         "",
-        "| # | Ticker | Navn | Anb. | Komposit | GEICO | Upside | Kurs | Stop | Regnskab |",
+        f"Model A · næste rebalancering: {stats.get('next_rebalance')} · i dag rebalanceringsdag: {stats.get('is_rebalance_day')}",
+        "",
+        "| # | Ticker | Navn | Model A | Momentum 6-1 | Komposit (info) | GEICO | Kurs | Stop −15 % | Regnskab |",
         "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for i, r in enumerate(rows, 1):
         lines.append(
-            f"| {i} | {r['ticker']} | {r['navn'] or ''} | {r['anbefaling']} | {_fmt(r['komposit'])} | "
-            f"{_fmt(r['geico_score'])} | {_fmt(r['upside_pct'], '%')} | {_fmt(r['kurs'])} | "
+            f"| {r['model_a_rank'] or i} | {r['ticker']} | {r['navn'] or ''} | {r['anbefaling']} | "
+            f"{_fmt(r['momentum_6_1_pct'], '%')} | {_fmt(r['komposit'])} | "
+            f"{_fmt(r['geico_score'])} | {_fmt(r['kurs'])} | "
             f"{_fmt(r['stop'])} ({_fmt(r['stop_pct'], '%')}) | {r['naeste_regnskab'] or '–'} |"
         )
     lines += ["", "Research-værktøj, ikke finansiel rådgivning."]

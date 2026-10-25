@@ -30,55 +30,33 @@ Notifikationsmetode (se README.md, "Automatisk dagligt tjek" for opsætning):
   (synligt under "Actions" på GitHub) uden fejl.
 """
 
-from core import analyze_ticker, find_top_candidates, load_static_watchlist
+import datetime
+
+import model_a
 from notify import send_notification  # udtrukket 2026-09-19, se notify.py
+
+# MODEL A (2026-10-25): notifikation KUN på rebalanceringsdage med den nye
+# top 5 (køb) — øvrige dage er der intet at gøre (stop-loss ligger i ordren).
+# Watchlist-aktier der er faldet under 200-dages snit nævnes som info samme dag.
 
 
 def main():
-    tickers = set(load_static_watchlist())
-    print(f"Statisk watchlist ({len(tickers)} tickere): {sorted(tickers)}")
-
-    print("Kører Top 10-scanning (kan tage et par minutter)...")
-    top_candidates, stats = find_top_candidates(top_n=10)
-    print(f"Top 10-scanning færdig: {stats}")
-    for c in top_candidates:
-        tickers.add(c["ticker"])
-
-    if not tickers:
-        print("Ingen tickere at tjekke (tom watchlist_tickers.txt og ingen Top 10-kandidater).")
+    rd = model_a.ranking(force=True)
+    reb = rd["rebalance"]
+    print(f"Model A top {model_a.N_POSITIONS}: {rd['top']} · rebalanceringsdag: {reb['is_rebalance_day']} "
+          f"· næste: {reb['next']}")
+    if not reb["is_rebalance_day"]:
+        print("Ikke rebalanceringsdag — ingen notifikation sendt.")
         return
 
-    signals = []
-    for ticker in sorted(tickers):
-        try:
-            result = analyze_ticker(ticker)
-        except Exception as e:
-            print(f"Sprang {ticker} over (uventet fejl: {e})")
-            continue
-        if not result.get("ok"):
-            print(f"Sprang {ticker} over ({result.get('reason')})")
-            continue
-
-        rec = result.get("recommendation", {})
-        action = rec.get("action")
-        price = result["ta"]["last_price"]
-        score = result["composite_score"]
-
-        if action in ("KØB", "SÆLG"):
-            triggers = rec.get("sell_triggers") if action == "SÆLG" else result["ta"]["ta_triggers"]
-            trigger_txt = "; ".join(triggers[:2]) if triggers else "—"
-            line = f"{action} {ticker} @ {price:.2f} (score {score:.0f}/100) — {trigger_txt}"
-            signals.append(line)
-            print(line)
-        else:
-            print(f"HOLD {ticker} @ {price:.2f} (score {score:.0f}/100)")
-
-    if signals:
-        title = f"Mine Aktier: {len(signals)} signal(er)"
-        body = "\n".join(signals) + "\n\nIkke finansiel rådgivning."
-        send_notification(title, body)
-    else:
-        print("Ingen KØB/SÆLG-signaler i dag — ingen notifikation sendt.")
+    lines = [f"Model A rebalancering {datetime.date.today().isoformat()}:"]
+    for t in rd["top"]:
+        r = rd["by_ticker"][t]
+        lines.append(f"KØB/BEHOLD {t} @ {r['last']:.2f} (momentum {r['momentum'] * 100:+.0f}%, "
+                     f"stop {r['last'] * (1 - model_a.STOP_PCT):.2f})")
+    lines.append("SÆLG alle øvrige positioner fra modellen.")
+    send_notification(f"Mine Aktier: model A rebalancering", "\n".join(lines) + "\n\nIkke finansiel rådgivning.")
+    print("\n".join(lines))
 
 
 if __name__ == "__main__":

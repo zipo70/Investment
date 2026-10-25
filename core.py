@@ -1742,8 +1742,28 @@ def analyze_ticker(ticker: str):
     plan = compute_trade_plan(df, ta["last_price"], cfg)
     recommendation = compute_recommendation(ta, long_term, fundamental, stocktwits, plan, composite)
     geico = compute_geico_profile(fundamental, analyst, long_term)  # info, ikke i komposit
+
+    # --- Model A styrer KØB/HOLD/SÆLG (2026-10-25, se model_a.py) ---
+    # Den gamle regel (kompositscore + tekniske sælg-signaler) gemmes kun som
+    # info under "teknisk_vurdering": validate_models.py viste at den tabte
+    # til indekset, mens model A var den eneste der bestod valideringen.
+    model_a_info = {}
+    try:
+        import model_a
+        ma_rank = model_a.ranking()
+        ma_sig = ma_rank["by_ticker"].get(ticker) or model_a.signals_for_df(df)
+        old_rec = recommendation
+        recommendation = model_a.action_for(ticker, ma_sig, ma_rank)
+        recommendation["teknisk_vurdering"] = old_rec
+        last = ta["last_price"]
+        plan = dict(plan, stop_price=last * (1 - model_a.STOP_PCT), stop_pct=-model_a.STOP_PCT * 100,
+                    stop_kilde=f"−{model_a.STOP_PCT * 100:.0f}% fra indgang (model A)")
+        model_a_info = {**ma_sig, "rank": recommendation.get("rank"),
+                        "next_rebalance": str(ma_rank["rebalance"]["next"])}
+    except Exception as e:  # falder tilbage til den gamle regel hvis model A fejler
+        recommendation = dict(recommendation, model_a_fejl=str(e))
     return {
-        "ok": True, "ta": ta, "long_term": long_term, "fundamental": fundamental,
+        "ok": True, "ta": ta, "long_term": long_term, "fundamental": fundamental, "model_a": model_a_info,
         "analyst": analyst, "stocktwits": stocktwits, "reddit": reddit,
         "aktieguld": aktieguld, "geico": geico,
         "composite_score": composite, "popularity_score": pop,
@@ -1754,6 +1774,38 @@ def analyze_ticker(ticker: str):
 
 
 def find_top_candidates(top_n: int = 10):
+    """Top 10 efter MODEL A (2026-10-25): universet rangeres efter 6-1 mdr.
+    momentum blandt aktier over 200-dages snit (model_a.ranking), og de
+    `top_n` første analyseres fuldt (fundamental, analytikere m.m. vises som
+    info). De 5 første er model A's portefølje (KØB). Den gamle komposit-
+    scanning findes stadig som _find_top_candidates_composite.
+
+    Returnerer (kandidater, stats) i samme format som før."""
+    import model_a
+    cfg = Config()
+    rd = model_a.ranking()
+    results = []
+    for i, r in enumerate(rd["ranked"][:top_n]):
+        res = analyze_ticker(r["ticker"])
+        if not res.get("ok"):
+            continue
+        res.update(ticker=r["ticker"], region=r["region"], meta=get_ticker_meta(r["ticker"]),
+                   short_name=res.get("short_name") or r["ticker"])
+        results.append(res)
+        if i < top_n - 1:
+            time.sleep(cfg.sentiment_request_delay_sec)
+    stats = {
+        "universe_size": rd["universe_size"], "skipped_data": rd["skipped_data"],
+        "skipped_trend": rd["skipped_trend"], "shortlist_size": len(results),
+        "high_skip_rate": rd["universe_size"] > 0
+                          and rd["skipped_data"] / rd["universe_size"] > cfg.scan_skipped_data_warn_ratio,
+        "next_rebalance": str(rd["rebalance"]["next"]),
+        "is_rebalance_day": rd["rebalance"]["is_rebalance_day"],
+    }
+    return results, stats
+
+
+def _find_top_candidates_composite(top_n: int = 10):
     """Scanner hele det kuraterede univers (~93 aktier) og returnerer de
     `top_n` bedst rangerede kandidater efter samme TA + analytiker/sentiment-
     komposit-score som resten af værktøjet. To trin, som i kandidat-

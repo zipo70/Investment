@@ -144,6 +144,7 @@ def _top10_technical_sort_key(c):
 # (nøglefunktion, faldende_rækkefølge). Manglende data lægges sidst i en
 # faldende sortering (-inf) og sorteres normalt (a-å) for tekst-felter.
 TOP10_SORT_OPTIONS = {
+    "Model A-rangering": (lambda c: c.get("model_a", {}).get("rank") or 999, False),
     "Komposit-score (høj → lav)": (lambda c: c["composite_score"], True),
     "Upside % (høj → lav)": (lambda c: c["upside_pct"] if c["upside_pct"] is not None else float("-inf"), True),
     "Teknisk score (høj → lav)": (_top10_technical_sort_key, True),
@@ -372,6 +373,8 @@ with tab_watch:
                     st.markdown(badge_html, unsafe_allow_html=True)
                     _upside_caveat_caption(result["upside_pct"])
                     with st.expander("Detaljer"):
+                        if rec.get("reasons"):
+                            _render_triggers("🧭", "Model A", rec["reasons"])
                         if rec.get("sell_triggers"):
                             _render_triggers("🔴", "Sælg-signaler", rec["sell_triggers"])
                         _render_triggers("📈", "Tekniske triggere (kort bane)", result["ta"]["ta_triggers"])
@@ -400,25 +403,17 @@ with tab_watch:
 # --- Top 10-fane ---
 with tab_top10:
     st.caption(
-        "Scanner det kuraterede aktieunivers (~93 aktier på tværs af USA, Europa, "
-        "Norden og emerging markets — samme liste som kandidat-screeneren) og "
-        "rangerer efter teknisk (kort+lang bane, 24%), fundamental (20%), "
-        "popularitet/analytiker-tiltro (36%) og \"Aktieguld\"-point (20%, en "
-        "tilnærmet gengivelse af Jens Løgstrups bogmodel — se Detaljer/Triggere "
-        "pr. aktie for forbehold) — populæritet vægtes tungest. "
-        "Ikke 'alle aktier på Yahoo Finance' — det er ikke teknisk muligt at scanne "
-        "uden at blive rate-limitet. Tager typisk 2-4 minutter; resultatet caches i "
-        "30 minutter, så du ikke behøver vente hver gang. Top 10 tjekkes desuden "
-        "automatisk hver dag — se README.md, afsnittet \"Automatisk dagligt tjek\"."
+        "MODEL A (valideret 2026-10-25): aktierne i det kuraterede univers over deres "
+        "200-dages snit rangeres efter 6-1 måneders momentum. De 5 første er modellens "
+        "portefølje (KØB, 20 % hver). Der købes og sælges kun på rebalanceringsdage "
+        "(hver ~3. måned); stop-loss −15 % gælder altid. Kompositscore, popularitet, "
+        "Aktieguld, GEICO og kursmønstre vises kun som information — de påvirker ikke "
+        "KØB/HOLD/SÆLG, fordi valideringen viste at de ikke forbedrede resultatet."
     )
     st.warning(
-        "Handelsforslagene (indgangskurs, stop-loss, datoer) og fundamental-scoren "
-        "er regelbaserede beregninger til videre research — ikke en anbefaling "
-        "eller garanti. Stop-loss-niveauet (tekniske niveau eller -10%-loft, alt "
-        "efter hvad der er strammest) og fundamental-scoren er nye regler, der "
-        "IKKE er backtestet endnu, i modsætning til resten af værktøjet. "
-        "Fundamental-scoren sammenligner heller ikke inden for samme branche "
-        "(en bank og en tech-aktie vurderes med samme skala)."
+        "Realistisk forventning ud fra valideringen: et merafkast på nogle få procent-"
+        "point om året over et globalt indeks, med fald på op til 35-40 % undervejs. "
+        "Ikke en anbefaling eller garanti."
     )
 
     if st.button("🔍 Find top 10 kandidater", use_container_width=True):
@@ -435,8 +430,13 @@ with tab_top10:
             f"Scannede {scan_stats['universe_size']} aktier · "
             f"{scan_stats['skipped_data']} kunne ikke hentes · "
             f"{scan_stats['skipped_trend']} bestod ikke trendfilteret · "
-            f"{scan_stats['shortlist_size']} gik videre til analytiker-/sentiment-analyse."
+            f"{scan_stats['shortlist_size']} vist med fuld analyse."
         )
+        if scan_stats.get("next_rebalance"):
+            if scan_stats.get("is_rebalance_day"):
+                st.success("📅 I dag er rebalanceringsdag for model A.")
+            else:
+                st.info(f"📅 Næste rebalancering for model A: {scan_stats['next_rebalance']}")
         if scan_stats.get("high_skip_rate"):
             st.warning(
                 f"⚠️ {scan_stats['skipped_data']} af {scan_stats['universe_size']} aktier kunne ikke "
@@ -488,10 +488,14 @@ with tab_top10:
                 else:
                     cols[1].metric("Stop-loss (forslag)", "–")
                     cols[1].caption("Intet klart niveau under nuværende kurs")
-                st.caption(f"Stopud dato (maks. holdeperiode ~{Config.swing_hold_days} handelsdage): "
-                           f"**{plan['stop_out_date']}** — luk positionen her hvis hverken mål eller stop er nået.")
+                nxt = c.get("model_a", {}).get("next_rebalance")
+                if nxt:
+                    st.caption(f"Model A: positionen vurderes igen ved næste rebalancering **{nxt}** "
+                               "(sælges hvis den ikke længere er i top 5).")
 
                 with st.expander("Triggere, nøgletal og kilder"):
+                    if rec.get("reasons"):
+                        _render_triggers("🧭", "Model A", rec["reasons"])
                     if rec.get("sell_triggers"):
                         _render_triggers("🔴", "Sælg-signaler", rec["sell_triggers"])
                     _render_triggers("📈", "Tekniske triggere (kort bane)", ta["ta_triggers"])

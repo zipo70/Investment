@@ -3,7 +3,12 @@ name: Generér Saxo-signaler
 on:
   schedule:
     - cron: "15 6 * * 1-5"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force_rebalance:
+        description: "Tving model A-rebalancering (skriv KØB/SÆLG-signaler i dag)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -22,6 +27,8 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Kør signal-generering
+        env:
+          MODEL_A_FORCE_REBALANCE: ${{ github.event.inputs.force_rebalance == 'true' && '1' || '0' }}
         run: python signal_job.py
 
       - name: Committér opdateret trading.db
