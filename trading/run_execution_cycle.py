@@ -24,6 +24,7 @@ Rækkefølge, hver kørsel:
      eksekvér et evt. resultat via order_executor.execute_order() (som
      selv håndhæver guardrails og sender notifikationer)."""
 
+import datetime
 import os
 
 from config import Config
@@ -48,6 +49,25 @@ def _strategy_cap() -> float:
     Default = backtestens startkapital, så positionsstørrelserne matcher."""
     raw = os.environ.get("SAXO_STRATEGY_CAPITAL", "").strip()
     return float(raw) if raw else Config().starting_capital
+
+
+def split_fresh_signals(rows, now, max_age_hours: float):
+    """Deler ventende signaler i (friske, forældede). Kun friske må handles —
+    et signal er beregnet på dagens kurs og stop-niveau, og bliver
+    meningsløst efter et par dage. Friske sorteres med SÆLG først (frigør
+    plads) og derefter højeste score, så de bedste køb vælges når der kun
+    er plads til få. Netværksfri."""
+    fresh, stale = [], []
+    for r in rows:
+        try:
+            created = datetime.datetime.fromisoformat(str(r["created_at"]).replace("Z", ""))
+        except ValueError:
+            stale.append(r)
+            continue
+        age_h = (now - created).total_seconds() / 3600.0
+        (fresh if age_h <= max_age_hours else stale).append(r)
+    fresh.sort(key=lambda r: (0 if r["direction"] == "SÆLG" else 1, -(r["score"] or 0)))
+    return fresh, stale
 
 
 def build_portfolio(positions_rows: dict, capital: dict) -> Portfolio:
@@ -91,9 +111,16 @@ def run_once():
             notify_order_activity("Kunne ikke synkronisere Saxo-konto", str(e))
             _report(f"Advarsel: poll_once fejlede ({e}) — fortsætter med sidst kendte tilstand.")
 
-        pending = db.get_pending_signals(conn)
+        max_age = float(os.environ.get("SAXO_SIGNAL_MAX_AGE_HOURS", "36") or 36)
+        pending, stale = split_fresh_signals(
+            db.get_pending_signals(conn), datetime.datetime.utcnow(), max_age)
+        for r in stale:
+            db.mark_signal(conn, r["external_reference"], "rejected",
+                           reject_reason=f"Forældet (ældre end {max_age:.0f} timer) — ikke handlet")
+        if stale:
+            _report(f"{len(stale)} forældede signaler afvist (ældre end {max_age:.0f} timer).")
         if not pending:
-            _report("Ingen ventende signaler.")
+            _report("Ingen friske ventende signaler.")
             return
 
         positions_rows = db.load_positions(conn)

@@ -34,6 +34,7 @@ jobs:
           SAXO_MAX_ORDER_AMOUNT: ${{ vars.SAXO_MAX_ORDER_AMOUNT || '25000' }}
           SAXO_MAX_ORDERS_PER_DAY: ${{ vars.SAXO_MAX_ORDERS_PER_DAY || '5' }}
           SAXO_STRATEGY_CAPITAL: ${{ vars.SAXO_STRATEGY_CAPITAL || '100000' }}
+          SAXO_SIGNAL_MAX_AGE_HOURS: ${{ vars.SAXO_SIGNAL_MAX_AGE_HOURS || '36' }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
@@ -46,7 +47,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add trading/state/trading.db trading/state/KILL_SWITCH 2>/dev/null || true
+          git add trading/state/trading.db
+          [ -f trading/state/KILL_SWITCH ] && git add trading/state/KILL_SWITCH || true
           git diff --cached --quiet && echo "Ingen ændringer at committe." || \
             git commit -m "trading_execution: opdater tilstand [skip ci]"
           git push

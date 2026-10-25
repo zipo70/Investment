@@ -19,7 +19,8 @@ from trading import db, guardrails, saxo_api, order_executor  # noqa: E402
 from trading.decision import OrderProposal  # noqa: E402
 from trading.instrument_mapping import filter_candidates, split_yahoo_ticker  # noqa: E402
 from trading.oauth import extract_code  # noqa: E402
-from trading.run_execution_cycle import build_portfolio  # noqa: E402
+from trading.run_execution_cycle import build_portfolio, split_fresh_signals  # noqa: E402
+import datetime  # noqa: E402
 
 
 # --- Antal aktier og valuta ---------------------------------------------------
@@ -150,6 +151,20 @@ def test_build_portfolio_uses_capital():
     p = build_portfolio({"AAPL": {"uic": 211, "entry_price": 100, "shares": 10}},
                         {"total_value": 100_000, "cash": 80_000})
     assert p.total_value == 100_000 and p.cash == 80_000 and "AAPL" in p.positions
+
+
+def test_stale_signals_are_split_off_and_fresh_sorted():
+    now = datetime.datetime(2026, 10, 25, 12, 0)
+    rows = [
+        {"external_reference": "old", "direction": "KØB", "score": 99, "created_at": "2026-09-21T11:00:00"},
+        {"external_reference": "lo", "direction": "KØB", "score": 60, "created_at": "2026-10-25T09:00:00"},
+        {"external_reference": "hi", "direction": "KØB", "score": 80, "created_at": "2026-10-24T11:30:00"},
+        {"external_reference": "sell", "direction": "SÆLG", "score": 10, "created_at": "2026-10-25T09:00:00"},
+        {"external_reference": "bad", "direction": "KØB", "score": 50, "created_at": "ikke-en-dato"},
+    ]
+    fresh, stale = split_fresh_signals(rows, now, 36)
+    assert [r["external_reference"] for r in fresh] == ["sell", "hi", "lo"]
+    assert sorted(r["external_reference"] for r in stale) == ["bad", "old"]
 
 
 # --- Instrument-opslag ---------------------------------------------------------
