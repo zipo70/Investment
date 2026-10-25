@@ -1,0 +1,247 @@
+{
+  "genereret_utc": "2026-10-25T12:49:07+00:00",
+  "config": {
+    "capital_dkk": 100000,
+    "risk_per_trade_dkk": 500,
+    "max_open_positions": 3,
+    "max_new_per_day": 3,
+    "candidates_per_day": 10,
+    "min_risk_pct": 0.003,
+    "max_risk_pct": 0.03,
+    "max_hold_days": 5,
+    "breakeven_at_r": 1.0,
+    "trail_r": 2.0,
+    "cost_per_side": 0.001,
+    "daily_target_dkk": 1000
+  },
+  "periode": {
+    "fra": "2023-11-21",
+    "til": "2026-10-23",
+    "tickere": 78,
+    "acwi_pct": 61.0
+  },
+  "scenarier": {
+    "Basis: maks 5 dage, 0,10 %": {
+      "handelsdage": 755,
+      "handler": 929,
+      "samlet_dkk": -51877,
+      "gns_pr_dag_dkk": -68.7,
+      "aarligt_afkast_pct": -21.7,
+      "dage_over_1000_pct": 8.2,
+      "dage_i_minus_pct": 47.7,
+      "max_drawdown_pct": -57.5,
+      "hitrate_pct": 29.2,
+      "profit_factor": 0.79,
+      "gns_gevinst_dkk": 733,
+      "gns_tab_dkk": -381,
+      "gns_holdetid_dage": 2.9,
+      "omkostninger_dkk": 56961,
+      "brutto_foer_omk_dkk": 5085,
+      "exit_aarsager": {
+        "stop": 344,
+        "maks holdetid": 158,
+        "break-even": 154,
+        "stop (gap)": 150,
+        "trailing stop": 119,
+        "data slut": 4
+      },
+      "pr_region": {
+        "Emerging Markets": -1877,
+        "Europa": -21607,
+        "Norden": -19669,
+        "USA": -8723
+      },
+      "pr_aar": {
+        "2023": 3826,
+        "2024": -4891,
+        "2025": -31203,
+        "2026": -19609
+      }
+    },
+    "Maks 3 dage": {
+      "handelsdage": 755,
+      "handler": 1163,
+      "samlet_dkk": -74242,
+      "gns_pr_dag_dkk": -98.3,
+      "aarligt_afkast_pct": -36.4,
+      "dage_over_1000_pct": 6.8,
+      "dage_i_minus_pct": 51.9,
+      "max_drawdown_pct": -76.9,
+      "hitrate_pct": 32.8,
+      "profit_factor": 0.73,
+      "gns_gevinst_dkk": 536,
+      "gns_tab_dkk": -356,
+      "gns_holdetid_dage": 2.4,
+      "omkostninger_dkk": 71694,
+      "brutto_foer_omk_dkk": -2548,
+      "exit_aarsager": {
+        "stop": 411,
+        "maks holdetid": 386,
+        "break-even": 160,
+        "stop (gap)": 127,
+        "trailing stop": 76,
+        "data slut": 3
+      },
+      "pr_region": {
+        "Emerging Markets": -1480,
+        "Europa": -30244,
+        "Norden": -10604,
+        "USA": -31913
+      },
+      "pr_aar": {
+        "2023": 2684,
+        "2024": -15018,
+        "2025": -25223,
+        "2026": -36686
+      }
+    },
+    "Maks 2 dage": {
+      "handelsdage": 755,
+      "handler": 1492,
+      "samlet_dkk": -81402,
+      "gns_pr_dag_dkk": -107.8,
+      "aarligt_afkast_pct": -43.0,
+      "dage_over_1000_pct": 7.0,
+      "dage_i_minus_pct": 55.8,
+      "max_drawdown_pct": -82.8,
+      "hitrate_pct": 37.9,
+      "profit_factor": 0.74,
+      "gns_gevinst_dkk": 406,
+      "gns_tab_dkk": -336,
+      "gns_holdetid_dage": 1.9,
+      "omkostninger_dkk": 92239,
+      "brutto_foer_omk_dkk": 10837,
+      "exit_aarsager": {
+        "maks holdetid": 779,
+        "stop": 430,
+        "break-even": 119,
+        "stop (gap)": 118,
+        "trailing stop": 44,
+        "data slut": 2
+      },
+      "pr_region": {
+        "Emerging Markets": 5346,
+        "Europa": -36336,
+        "Norden": -21187,
+        "USA": -29225
+      },
+      "pr_aar": {
+        "2023": 313,
+        "2024": -23618,
+        "2025": -25463,
+        "2026": -32635
+      }
+    },
+    "Maks 10 dage": {
+      "handelsdage": 755,
+      "handler": 763,
+      "samlet_dkk": -39241,
+      "gns_pr_dag_dkk": -52.0,
+      "aarligt_afkast_pct": -15.3,
+      "dage_over_1000_pct": 7.2,
+      "dage_i_minus_pct": 42.6,
+      "max_drawdown_pct": -44.8,
+      "hitrate_pct": 26.1,
+      "profit_factor": 0.81,
+      "gns_gevinst_dkk": 824,
+      "gns_tab_dkk": -360,
+      "gns_holdetid_dage": 3.5,
+      "omkostninger_dkk": 46693,
+      "brutto_foer_omk_dkk": 7453,
+      "exit_aarsager": {
+        "stop": 291,
+        "break-even": 151,
+        "trailing stop": 146,
+        "stop (gap)": 129,
+        "maks holdetid": 42,
+        "data slut": 4
+      },
+      "pr_region": {
+        "Emerging Markets": -1934,
+        "Europa": -26003,
+        "Norden": -12795,
+        "USA": 1491
+      },
+      "pr_aar": {
+        "2023": -2539,
+        "2024": -1552,
+        "2025": -16350,
+        "2026": -18800
+      }
+    },
+    "Lave omkostninger (0,05 %)": {
+      "handelsdage": 755,
+      "handler": 929,
+      "samlet_dkk": -23396,
+      "gns_pr_dag_dkk": -31.0,
+      "aarligt_afkast_pct": -8.5,
+      "dage_over_1000_pct": 8.5,
+      "dage_i_minus_pct": 46.8,
+      "max_drawdown_pct": -36.1,
+      "hitrate_pct": 30.1,
+      "profit_factor": 0.9,
+      "gns_gevinst_dkk": 739,
+      "gns_tab_dkk": -355,
+      "gns_holdetid_dage": 2.9,
+      "omkostninger_dkk": 28481,
+      "brutto_foer_omk_dkk": 5085,
+      "exit_aarsager": {
+        "stop": 344,
+        "maks holdetid": 158,
+        "break-even": 154,
+        "stop (gap)": 150,
+        "trailing stop": 119,
+        "data slut": 4
+      },
+      "pr_region": {
+        "Emerging Markets": 582,
+        "Europa": -12471,
+        "Norden": -12939,
+        "USA": 1433
+      },
+      "pr_aar": {
+        "2023": 4663,
+        "2024": 4289,
+        "2025": -21111,
+        "2026": -11237
+      }
+    },
+    "Høje omkostninger (0,15 %)": {
+      "handelsdage": 755,
+      "handler": 929,
+      "samlet_dkk": -80357,
+      "gns_pr_dag_dkk": -106.4,
+      "aarligt_afkast_pct": -41.9,
+      "dage_over_1000_pct": 7.9,
+      "dage_i_minus_pct": 48.7,
+      "max_drawdown_pct": -82.2,
+      "hitrate_pct": 28.2,
+      "profit_factor": 0.7,
+      "gns_gevinst_dkk": 727,
+      "gns_tab_dkk": -406,
+      "gns_holdetid_dage": 2.9,
+      "omkostninger_dkk": 85442,
+      "brutto_foer_omk_dkk": 5085,
+      "exit_aarsager": {
+        "stop": 344,
+        "maks holdetid": 158,
+        "break-even": 154,
+        "stop (gap)": 150,
+        "trailing stop": 119,
+        "data slut": 4
+      },
+      "pr_region": {
+        "Emerging Markets": -4336,
+        "Europa": -30743,
+        "Norden": -26399,
+        "USA": -18879
+      },
+      "pr_aar": {
+        "2023": 2988,
+        "2024": -14070,
+        "2025": -41295,
+        "2026": -27981
+      }
+    }
+  }
+}
