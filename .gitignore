@@ -1,0 +1,23 @@
+# Python-cache og byggefiler
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Virtuelle miljøer
+.venv/
+venv/
+env/
+
+# Hemmeligheder — må ALDRIG i repoet
+.env
+.streamlit/secrets.toml
+trading/state/saxo_tokens.json
+
+# OS- og editor-filer
+.DS_Store
+.ipynb_checkpoints/
+.vscode/
+.idea/
+
+# BEMÆRK: trading/state/trading.db ignoreres bevidst IKKE —
+# signal_job.yml committer den løbende som revisionsspor.
