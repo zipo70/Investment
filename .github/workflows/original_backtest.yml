@@ -1,0 +1,41 @@
+name: Original swing-backtest
+
+# Kører original_backtest_export.py (original strategi vs. ACWI) og gemmer
+# resultatet i output/. Startes manuelt (Run workflow).
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: original-backtest
+  cancel-in-progress: false
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installér afhængigheder
+        run: pip install -r requirements.txt
+
+      - name: Kør original backtest
+        run: python original_backtest_export.py
+
+      - name: Committér resultat
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/original_backtest.json output/original_backtest.md
+          git diff --cached --quiet && echo "Ingen ændringer." && exit 0
+          git commit -m "original_backtest: opdater resultat [skip ci]"
+          for i in 1 2 3; do git pull --rebase && git push && exit 0; sleep 5; done
+          exit 1
