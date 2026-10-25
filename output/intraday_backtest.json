@@ -1,0 +1,301 @@
+{
+  "genereret_utc": "2026-10-25T12:35:31+00:00",
+  "config": {
+    "capital_dkk": 100000,
+    "daily_target_dkk": 1000,
+    "daily_loss_limit_dkk": 1000,
+    "risk_per_trade_dkk": 500,
+    "max_position_frac": 0.3333333333333333,
+    "max_trades_per_day": 3,
+    "candidates_per_day": 10,
+    "max_sell_score": 20,
+    "reward_risk": 2.0,
+    "min_risk_pct": 0.003,
+    "max_risk_pct": 0.03,
+    "cost_per_side": 0.001,
+    "allow_overnight": true,
+    "overnight_top_of_range": 0.8
+  },
+  "datasaet": {
+    "Timedata, ~2 år": {
+      "periode": {
+        "fra": "2023-11-21",
+        "til": "2026-10-23",
+        "tickere": 78,
+        "acwi_pct": 61.0
+      },
+      "scenarier": {
+        "Basis (0,10 % pr. vej, nat tilladt)": {
+          "handelsdage": 755,
+          "handler": 1944,
+          "dage_med_handel": 731,
+          "samlet_dkk": -125539,
+          "gns_pr_dag_dkk": -166.3,
+          "aarligt_afkast_pct": null,
+          "dage_over_1000_pct": 2.3,
+          "dage_i_plus_pct": 27.9,
+          "dage_i_minus_pct": 68.9,
+          "bedste_dag_dkk": 1720,
+          "vaerste_dag_dkk": -1891,
+          "max_drawdown_pct": -127.9,
+          "hitrate_pct": 24.5,
+          "profit_factor": 0.53,
+          "gns_gevinst_dkk": 301.0,
+          "gns_tab_dkk": -183.0,
+          "omkostninger_dkk": 121534,
+          "natten_over": 555,
+          "pr_region": {
+            "Emerging Markets": -8098,
+            "Europa": -51614,
+            "Norden": -24593,
+            "USA": -41234
+          }
+        },
+        "Uden natten over": {
+          "handelsdage": 755,
+          "handler": 1943,
+          "dage_med_handel": 731,
+          "samlet_dkk": -121391,
+          "gns_pr_dag_dkk": -160.8,
+          "aarligt_afkast_pct": null,
+          "dage_over_1000_pct": 1.1,
+          "dage_i_plus_pct": 31.5,
+          "dage_i_minus_pct": 65.3,
+          "bedste_dag_dkk": 1633,
+          "vaerste_dag_dkk": -1522,
+          "max_drawdown_pct": -123.8,
+          "hitrate_pct": 35.0,
+          "profit_factor": 0.47,
+          "gns_gevinst_dkk": 159.0,
+          "gns_tab_dkk": -182.0,
+          "omkostninger_dkk": 121468,
+          "natten_over": 0,
+          "pr_region": {
+            "Emerging Markets": -9279,
+            "Europa": -50303,
+            "Norden": -25543,
+            "USA": -36266
+          }
+        },
+        "Lave omkostninger (0,05 %)": {
+          "handelsdage": 755,
+          "handler": 1946,
+          "dage_med_handel": 731,
+          "samlet_dkk": -64429,
+          "gns_pr_dag_dkk": -85.3,
+          "aarligt_afkast_pct": -29.2,
+          "dage_over_1000_pct": 3.2,
+          "dage_i_plus_pct": 33.5,
+          "dage_i_minus_pct": 63.3,
+          "bedste_dag_dkk": 1810,
+          "vaerste_dag_dkk": -1796,
+          "max_drawdown_pct": -67.3,
+          "hitrate_pct": 27.7,
+          "profit_factor": 0.71,
+          "gns_gevinst_dkk": 295.0,
+          "gns_tab_dkk": -159.0,
+          "omkostninger_dkk": 60826,
+          "natten_over": 556,
+          "pr_region": {
+            "Emerging Markets": -4066,
+            "Europa": -27507,
+            "Norden": -6501,
+            "USA": -26355
+          }
+        },
+        "Høje omkostninger (0,15 %)": {
+          "handelsdage": 755,
+          "handler": 1942,
+          "dage_med_handel": 731,
+          "samlet_dkk": -186012,
+          "gns_pr_dag_dkk": -246.4,
+          "aarligt_afkast_pct": null,
+          "dage_over_1000_pct": 1.7,
+          "dage_i_plus_pct": 24.1,
+          "dage_i_minus_pct": 72.7,
+          "bedste_dag_dkk": 1631,
+          "vaerste_dag_dkk": -1987,
+          "max_drawdown_pct": -188.1,
+          "hitrate_pct": 21.4,
+          "profit_factor": 0.41,
+          "gns_gevinst_dkk": 311.0,
+          "gns_tab_dkk": -206.0,
+          "omkostninger_dkk": 182114,
+          "natten_over": 555,
+          "pr_region": {
+            "Emerging Markets": -12129,
+            "Europa": -75113,
+            "Norden": -42384,
+            "USA": -56386
+          }
+        },
+        "Uden 1.000 kr.-loft": {
+          "handelsdage": 755,
+          "handler": 1944,
+          "dage_med_handel": 731,
+          "samlet_dkk": -125539,
+          "gns_pr_dag_dkk": -166.3,
+          "aarligt_afkast_pct": null,
+          "dage_over_1000_pct": 0.0,
+          "dage_i_plus_pct": 27.9,
+          "dage_i_minus_pct": 68.9,
+          "bedste_dag_dkk": 1720,
+          "vaerste_dag_dkk": -1891,
+          "max_drawdown_pct": -127.9,
+          "hitrate_pct": 24.5,
+          "profit_factor": 0.53,
+          "gns_gevinst_dkk": 301.0,
+          "gns_tab_dkk": -183.0,
+          "omkostninger_dkk": 121534,
+          "natten_over": 555,
+          "pr_region": {
+            "Emerging Markets": -8098,
+            "Europa": -51614,
+            "Norden": -24593,
+            "USA": -41234
+          }
+        }
+      }
+    },
+    "5-min-data, ~60 dage": {
+      "periode": {
+        "fra": "2026-07-31",
+        "til": "2026-10-23",
+        "tickere": 78,
+        "acwi_pct": 0.2
+      },
+      "scenarier": {
+        "Basis (0,10 % pr. vej, nat tilladt)": {
+          "handelsdage": 61,
+          "handler": 177,
+          "dage_med_handel": 61,
+          "samlet_dkk": -18175,
+          "gns_pr_dag_dkk": -297.9,
+          "aarligt_afkast_pct": -56.3,
+          "dage_over_1000_pct": 3.3,
+          "dage_i_plus_pct": 24.6,
+          "dage_i_minus_pct": 75.4,
+          "bedste_dag_dkk": 2127,
+          "vaerste_dag_dkk": -1280,
+          "max_drawdown_pct": -19.9,
+          "hitrate_pct": 23.7,
+          "profit_factor": 0.45,
+          "gns_gevinst_dkk": 349.0,
+          "gns_tab_dkk": -243.0,
+          "omkostninger_dkk": 11401,
+          "natten_over": 25,
+          "pr_region": {
+            "Emerging Markets": -812,
+            "Europa": -8612,
+            "Norden": -5197,
+            "USA": -3554
+          }
+        },
+        "Uden natten over": {
+          "handelsdage": 61,
+          "handler": 177,
+          "dage_med_handel": 61,
+          "samlet_dkk": -18290,
+          "gns_pr_dag_dkk": -299.8,
+          "aarligt_afkast_pct": -56.6,
+          "dage_over_1000_pct": 1.6,
+          "dage_i_plus_pct": 24.6,
+          "dage_i_minus_pct": 75.4,
+          "bedste_dag_dkk": 1757,
+          "vaerste_dag_dkk": -1280,
+          "max_drawdown_pct": -20.3,
+          "hitrate_pct": 29.4,
+          "profit_factor": 0.42,
+          "gns_gevinst_dkk": 258.0,
+          "gns_tab_dkk": -254.0,
+          "omkostninger_dkk": 11401,
+          "natten_over": 0,
+          "pr_region": {
+            "Emerging Markets": -812,
+            "Europa": -8602,
+            "Norden": -5697,
+            "USA": -3179
+          }
+        },
+        "Lave omkostninger (0,05 %)": {
+          "handelsdage": 61,
+          "handler": 177,
+          "dage_med_handel": 61,
+          "samlet_dkk": -12474,
+          "gns_pr_dag_dkk": -204.5,
+          "aarligt_afkast_pct": -42.3,
+          "dage_over_1000_pct": 4.9,
+          "dage_i_plus_pct": 26.2,
+          "dage_i_minus_pct": 73.8,
+          "bedste_dag_dkk": 2221,
+          "vaerste_dag_dkk": -1194,
+          "max_drawdown_pct": -14.6,
+          "hitrate_pct": 27.7,
+          "profit_factor": 0.56,
+          "gns_gevinst_dkk": 328.0,
+          "gns_tab_dkk": -223.0,
+          "omkostninger_dkk": 5700,
+          "natten_over": 25,
+          "pr_region": {
+            "Emerging Markets": -738,
+            "Europa": -5997,
+            "Norden": -2938,
+            "USA": -2801
+          }
+        },
+        "Høje omkostninger (0,15 %)": {
+          "handelsdage": 61,
+          "handler": 177,
+          "dage_med_handel": 61,
+          "samlet_dkk": -23875,
+          "gns_pr_dag_dkk": -391.4,
+          "aarligt_afkast_pct": -67.6,
+          "dage_over_1000_pct": 3.3,
+          "dage_i_plus_pct": 18.0,
+          "dage_i_minus_pct": 82.0,
+          "bedste_dag_dkk": 2033,
+          "vaerste_dag_dkk": -1367,
+          "max_drawdown_pct": -25.3,
+          "hitrate_pct": 23.2,
+          "profit_factor": 0.36,
+          "gns_gevinst_dkk": 325.0,
+          "gns_tab_dkk": -274.0,
+          "omkostninger_dkk": 17101,
+          "natten_over": 25,
+          "pr_region": {
+            "Emerging Markets": -886,
+            "Europa": -11227,
+            "Norden": -7455,
+            "USA": -4307
+          }
+        },
+        "Uden 1.000 kr.-loft": {
+          "handelsdage": 61,
+          "handler": 177,
+          "dage_med_handel": 61,
+          "samlet_dkk": -18175,
+          "gns_pr_dag_dkk": -297.9,
+          "aarligt_afkast_pct": -56.3,
+          "dage_over_1000_pct": 0.0,
+          "dage_i_plus_pct": 24.6,
+          "dage_i_minus_pct": 75.4,
+          "bedste_dag_dkk": 2127,
+          "vaerste_dag_dkk": -1280,
+          "max_drawdown_pct": -19.9,
+          "hitrate_pct": 23.7,
+          "profit_factor": 0.45,
+          "gns_gevinst_dkk": 349.0,
+          "gns_tab_dkk": -243.0,
+          "omkostninger_dkk": 11401,
+          "natten_over": 25,
+          "pr_region": {
+            "Emerging Markets": -812,
+            "Europa": -8612,
+            "Norden": -5197,
+            "USA": -3554
+          }
+        }
+      }
+    }
+  }
+}
