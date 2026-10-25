@@ -34,6 +34,15 @@ from trading.order_executor import ExecutionError, execute_order
 from notify import notify_order_activity
 
 
+def _report(msg: str):
+    """Print — og i GitHub Actions også som annotation, så forløbet kan
+    læses via API uden adgang til den fulde log."""
+    print(msg)
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        safe = msg.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+        print(f"::notice title=Saxo-cyklus::{safe[:3000]}")
+
+
 def _strategy_cap() -> float:
     """Hvor meget af SIM-kontoen strategien må bruge (kontoens valuta).
     Default = backtestens startkapital, så positionsstørrelserne matcher."""
@@ -56,7 +65,7 @@ def build_portfolio(positions_rows: dict, capital: dict) -> Portfolio:
 
 def run_once():
     if guardrails.kill_switch_active():
-        print("Kill switch er aktiv — afbryder uden at foretage mig noget.")
+        _report("Kill switch er aktiv — afbryder uden at foretage mig noget.")
         return
 
     access_token = oauth.get_valid_access_token()  # rejser + stopper selv ved fejl
@@ -70,21 +79,21 @@ def run_once():
         notify_order_activity("Kunne ikke hente Saxo-konto/saldo", str(e))
         raise
     capital = saxo_api.strategy_capital(balance, _strategy_cap())
-    print(f"Konto {account['account_key']} ({account['currency']}): "
+    _report(f"Konto {account['account_key']} ({account['currency']}): "
           f"saldo {balance['total_value']:.0f}, strategi-kapital {capital['total_value']:.0f}, "
           f"ledig {capital['cash']:.0f}. Dry-run: {gcfg.dry_run}")
 
     with db.connect() as conn:
         try:
             result = monitor.poll_once(conn, access_token)
-            print(f"Synkroniseret {result['synced']} positioner.")
+            _report(f"Synkroniseret {result['synced']} positioner.")
         except Exception as e:
             notify_order_activity("Kunne ikke synkronisere Saxo-konto", str(e))
-            print(f"Advarsel: poll_once fejlede ({e}) — fortsætter med sidst kendte tilstand.")
+            _report(f"Advarsel: poll_once fejlede ({e}) — fortsætter med sidst kendte tilstand.")
 
         pending = db.get_pending_signals(conn)
         if not pending:
-            print("Ingen ventende signaler.")
+            _report("Ingen ventende signaler.")
             return
 
         positions_rows = db.load_positions(conn)
@@ -120,7 +129,7 @@ def run_once():
                     account=account, last_price=signal.last_price, gcfg=gcfg,
                 )
             except (guardrails.GuardrailViolation, ExecutionError, saxo_api.SaxoApiError) as e:
-                print(f"{signal.ticker}: {e}")
+                _report(f"{signal.ticker}: {e}")
                 continue  # logget + notificeret inde i execute_order()
 
             # Køb binder kapital — træk fra, så næste signal i samme kørsel
@@ -128,6 +137,10 @@ def run_once():
             if proposal.direction == "KØB" and proposal.notional:
                 capital["cash"] = max(0.0, capital["cash"] - proposal.notional)
             positions_rows = db.load_positions(conn)
+
+        counts = conn.execute(
+            "SELECT status, COUNT(*) n FROM signals GROUP BY status").fetchall()
+        _report("Signal-status efter kørsel: " + ", ".join(f"{r['status']}={r['n']}" for r in counts))
 
 
 if __name__ == "__main__":
