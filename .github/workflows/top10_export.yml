@@ -1,0 +1,47 @@
+name: Top 10-eksport
+
+# Kører Top 10-scanningen hver hverdag kl. ~07:40 dansk tid (før markedet
+# åbner) og gemmer resultatet i output/top10.json + output/top10.md, så
+# Claude kan læse det. Kan også startes manuelt (Run workflow).
+
+on:
+  schedule:
+    - cron: "40 5 * * 1-5"   # 05:40 UTC = 06:40 vintertid / 07:40 sommertid
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: top10-export
+  cancel-in-progress: false
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installér afhængigheder
+        run: pip install -r requirements.txt
+
+      - name: Kør Top 10-scanning
+        env:
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+        run: python top10_export.py
+
+      - name: Committér resultat
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/top10.json output/top10.md
+          git diff --cached --quiet && echo "Ingen ændringer." && exit 0
+          git commit -m "top10_export: opdater Top 10 [skip ci]"
+          for i in 1 2 3; do git pull --rebase && git push && exit 0; sleep 5; done
+          exit 1
