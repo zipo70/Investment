@@ -3,7 +3,12 @@ name: Saxo-eksekvering (Lag 3)
 on:
   # schedule:
   #   - cron: "*/15 7-21 * * 1-5"   # slå til når du selv er tilfreds med testresultaterne
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      live:
+        description: "Send rigtige ordrer til SIM-kontoen (slår dry-run fra for KUN denne kørsel)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -30,7 +35,7 @@ jobs:
           SAXO_TOKEN_BACKEND: github_secret
           SAXO_TOKENS_JSON: ${{ secrets.SAXO_TOKENS_JSON }}
           GH_PAT_FOR_SECRETS: ${{ secrets.GH_PAT_FOR_SECRETS }}
-          SAXO_DRY_RUN: ${{ vars.SAXO_DRY_RUN || 'true' }}
+          SAXO_DRY_RUN: ${{ github.event.inputs.live == 'true' && 'false' || vars.SAXO_DRY_RUN || 'true' }}  # live-input gælder kun den manuelle kørsel
           SAXO_MAX_ORDER_AMOUNT: ${{ vars.SAXO_MAX_ORDER_AMOUNT || '7000' }}  # EUR; 20 % af 33.500 = 6.700
           SAXO_MAX_ORDERS_PER_DAY: ${{ vars.SAXO_MAX_ORDERS_PER_DAY || '1' }}  # første test: maks 1 ordre pr. dag
           SAXO_STRATEGY_CAPITAL: ${{ vars.SAXO_STRATEGY_CAPITAL || '33500' }}  # ca. 250.000 kr. (kontoen er i EUR) — så én plads (~50.000 kr.) rækker til 2 Mærsk-aktier
