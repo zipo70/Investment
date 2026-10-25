@@ -244,3 +244,13 @@ def log_activity(conn, kind: str, detail: str):
         "INSERT INTO order_activity_log (ts, kind, detail) VALUES (?, ?, ?)",
         (_now(), kind, detail),
     )
+
+
+def get_ticker_by_uic(conn, uic):
+    """Baglæns opslag Uic -> Yahoo-ticker via instrument_cache (bruges af
+    monitor.poll_once til at genkende Saxo-positioner)."""
+    row = conn.execute(
+        "SELECT yahoo_ticker FROM instrument_cache WHERE uic = ? ORDER BY cached_at DESC LIMIT 1",
+        (uic,),
+    ).fetchone()
+    return row["yahoo_ticker"] if row else None

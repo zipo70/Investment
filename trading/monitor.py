@@ -22,7 +22,7 @@ import os
 
 import requests
 
-from trading import db
+from trading import db, saxo_api
 
 API_BASE_URL = os.environ.get("SAXO_API_BASE_URL", "https://gateway.saxobank.com/sim/openapi")
 STREAMING_BASE_URL = os.environ.get(
@@ -30,18 +30,25 @@ STREAMING_BASE_URL = os.environ.get(
 )
 
 
-def poll_once(conn, access_token: str):
+def poll_once(conn, access_token: str) -> dict:
     """Henter åbne ordrer + positioner fra Saxo og synkroniserer den
     lokale positions-tabel (som decision.py's Portfolio bygges ud fra) —
-    så en position lukket/åbnet manuelt direkte i Saxo også bliver
-    respekteret, ikke kun ordrer VI selv har sendt."""
+    så en position lukket/åbnet manuelt direkte i Saxo også respekteres.
+
+    Saxo kender kun Uic, ikke Yahoo-tickeren; den slås op baglæns i
+    instrument_cache (fyldt af instrument_mapping.lookup_uic). En position
+    i et instrument vi ALDRIG selv har slået op (fx købt manuelt i
+    SaxoTraderGO) kan ikke kobles til en ticker — den logges og røres
+    ikke, i stedet for at blive gættet.
+
+    Returnerer {"synced": n, "unknown_uics": [...]} til logning."""
     headers = {"Authorization": f"Bearer {access_token}"}
 
     orders_resp = requests.get(f"{API_BASE_URL}/port/v1/orders/me", headers=headers, timeout=20)
     orders_resp.raise_for_status()
     for o in orders_resp.json().get("Data", []):
         ext_ref = o.get("ExternalReference")
-        if not ext_ref:
+        if not ext_ref or ext_ref.endswith("-stop"):
             continue
         db.update_order_status(
             conn, ext_ref, status=_map_saxo_order_status(o.get("Status")),
@@ -50,31 +57,32 @@ def poll_once(conn, access_token: str):
 
     positions_resp = requests.get(f"{API_BASE_URL}/port/v1/positions/me", headers=headers, timeout=20)
     positions_resp.raise_for_status()
+    aggregated = saxo_api.aggregate_positions(positions_resp.json().get("Data", []))
 
-    # TODO: Saxo's position-svar identificerer instrumentet via Uic, ikke
-    # via Yahoo-tickeren "Mine Aktier" ellers bruger overalt — byg en
-    # baglæns opslagstabel (Uic -> yahoo_ticker) ud fra instrument_cache
-    # (se db.py) i stedet for feltet "_YahooTickerHint" herunder, som
-    # IKKE er et rigtigt Saxo-felt (det er en placeholder, så skelettets
-    # hensigt er tydelig — udfyld selv det rigtige opslag).
-    saxo_tickers_seen = set()
-    for p in positions_resp.json().get("Data", []):
-        base = p.get("PositionBase", {})
-        ticker = base.get("_YahooTickerHint")
+    seen, unknown = set(), []
+    for uic, pos in aggregated.items():
+        ticker = db.get_ticker_by_uic(conn, uic)
         if not ticker:
+            unknown.append(uic)
             continue
-        saxo_tickers_seen.add(ticker)
+        seen.add(ticker)
         db.upsert_position(
-            conn, ticker=ticker, uic=base.get("Uic"), asset_type=base.get("AssetType"),
-            shares=base.get("Amount"), entry_price=base.get("OpenPrice"),
-            entry_date=base.get("ExecutionTimeOpen"), external_reference=None,
+            conn, ticker=ticker, uic=uic, asset_type=pos["asset_type"],
+            shares=pos["shares"], entry_price=pos["entry_price"],
+            entry_date=pos["entry_date"] or db._now(), external_reference=None,
         )
+    if unknown:
+        db.log_activity(conn, "unknown_positions",
+                        f"Saxo-positioner uden kendt ticker (Uic): {unknown} — ignoreret")
 
     # Positioner vi troede var åbne, men som Saxo ikke længere viser -> lukket
     # (fx stoppet ud, eller lukket manuelt) -> fjern lokalt.
     for ticker in list(db.load_positions(conn).keys()):
-        if ticker not in saxo_tickers_seen:
+        if ticker not in seen:
             db.remove_position(conn, ticker)
+            db.log_activity(conn, "position_closed", f"{ticker} findes ikke længere hos Saxo")
+
+    return {"synced": len(seen), "unknown_uics": unknown}
 
 
 def _map_saxo_order_status(saxo_status: str) -> str:

@@ -170,37 +170,48 @@ Alt dette er testet uden netværk (se kørslerne jeg lavede under
 udviklingen — guardrail-afvisning, dagslag, kill switch, og en fuld
 dry-run-eksekvering med idempotens-tjek virkede alle korrekt).
 
-## Hvad der IKKE er færdigt endnu (udfyld/test selv)
+## Status 2026-10-25 — skelettet er færdigkodet
 
-- **`trading/order_executor._build_order_body()`**: skitse af Saxo-
-  ordre-JSON'en, ikke verificeret mod den faktiske API-kontrakt. Kør
-  altid mod `/trade/v2/orders/precheck` og sammenlign med Saxos egen
-  Swagger/dokumentation, før `SAXO_DRY_RUN=false`. Særligt: `Amount`
-  skal formentlig være ANTAL AKTIER, ikke et beløb — der mangler en
-  omregning via seneste kurs.
-- **`trading/instrument_mapping.py`**: søgningen er en simpel
-  tekst-baseret Saxo-instrumentsøgning. Er der mere end ét træf, fejler
-  den bevidst (i stedet for at gætte) — du skal formentlig selv bygge en
-  lille manuel oversættelsestabel for dine mest brugte tickere.
-- **`trading/monitor.py`**: `poll_once()` er skrevet, men positions-
-  synkroniseringen bruger et placeholder-felt (`_YahooTickerHint`, IKKE
-  et rigtigt Saxo-felt) — du skal koble den til en rigtig Uic→Yahoo-
-  baglæns-opslagstabel. `run_websocket_forever()` er kun skitseret (se
-  "Hosting" ovenfor for hvorfor).
-- **`run_execution_cycle._portfolio_from_positions()`**: bruger
-  `cfg.starting_capital` som et EKSPLICIT forkert stedfortræder for den
-  faktiske kontoværdi — skal kobles til Saxos `/port/v1/balances/me`,
-  før `SAXO_DRY_RUN=false`.
-- **Første-gangs OAuth-autorisation**: løst for telefon-/GitHub-only
-  brug via `--print-auth-url`/`--exchange-code` + bootstrap-workflowet,
-  se "Hosting" ovenfor. Har du i stedet en pc/Mac til rådighed en dag,
-  kan du bruge den simplere `python -m trading.oauth --authorize`
-  (åbner selv en browser og fanger redirect'et).
-- **`trading/token_store.GitHubSecretTokenStore`**: implementeret og
-  testet (krypterings-round-trip verificeret med PyNaCl) — IKKE længere
-  kun en skitse. Selve GitHub API-kaldet er ikke afprøvet mod en rigtig
-  konto herfra (jeg har ikke adgang til dit repo), så følg med i
-  bootstrap-workflowets log første gang, og sig til hvis noget fejler.
+De tidligere åbne punkter er lukket og dækket af 27 netværksfri tests
+(`tests/test_saxo_execution.py`, Saxo-kald mocket):
+
+| Punkt | Løsning |
+|---|---|
+| `Amount` som beløb | Omregnes til **antal hele aktier** (rundes ned). Valutakurs hentes fra Saxo selv via et precheck på 1 aktie (`InstrumentToAccountConversionRate`) |
+| Ordre-JSON | `ManualOrder: false`, stop-loss som relateret ordre i samme kald, stop-type fra instrumentets egne understøttede typer (typisk `StopIfTraded`), stop-pris afrundet til tick-størrelse |
+| Salg | Åbne stop-ordrer på aktien annulleres FØR markedssalget |
+| Precheck | Fejl fanges både via HTTP-status, `ErrorInfo`, `PreCheckResult` og uaccepterede handels-disclaimers |
+| Instrument-opslag | Filtreres på børs (Yahoo-suffiks -> MIC) og aktieklasse. Manuelle rettelser i `trading/instrument_overrides.json` |
+| Positions-sync | Baglæns Uic -> ticker via `instrument_cache`. Flere Saxo-positioner i samme aktie samles |
+| Kontoværdi | Hentes fra Saxo. **Kapitalloft** `SAXO_STRATEGY_CAPITAL` (default 100.000 = backtestens startkapital), da SIM-konti typisk har et stort fiktivt beløb |
+| AccountKey | Slås automatisk op, hvis secret `SAXO_ACCOUNT_KEY` ikke er sat |
+| OAuth 401 | Bootstrap accepterer nu HELE adressen fra Safari; ved fejl vises sikker fejlsøgning (redirect_uri, client_id-længde) og der forsøges også Basic-auth |
+
+**Stadig ikke lavet (bevidst):** `run_websocket_forever()` (kræver VPS),
+og det rigtige API-kontrakt er kun verificeret mod Saxos dokumentation —
+den første rigtige SIM-kørsel er den egentlige test.
+
+### Testplan på SIM-kontoen
+
+1. **Autorisation:** Byg autorisations-URL'en, log ind i Safari, kopiér
+   HELE adressen efter redirect, og kør straks
+   "Saxo — første-gangs autorisation" med den som input.
+2. **Dry-run (standard):** Kør "Saxo-eksekvering (Lag 3)" manuelt. Loggen
+   viser konto, valuta, saldo og strategi-kapital. Dry-run kalder Saxos
+   precheck (for valutakursen), men afgiver ingen ordrer.
+3. **Instrument-opslag:** Fejler et opslag, står kandidaterne i
+   notifikationen. Tilføj den rigtige i `trading/instrument_overrides.json`.
+4. **Første rigtige SIM-ordre:** Sæt repo-variablen `SAXO_DRY_RUN=false`,
+   evt. `SAXO_MAX_ORDERS_PER_DAY=1` den første dag, og kør i børsens
+   åbningstid. Tjek ordren og stop-loss'en i SaxoTraderGO (SIM).
+5. **Automatik:** Afkommentér `schedule` i `trading_execution.yml`, når
+   du er tryg.
+
+**Vigtigt om forventninger:** SIM-testen beviser at MEKANIKKEN virker
+(signal -> ordre -> stop -> salg). Den kan ikke på få uger vise om
+strategien tjener penge — det kræver mange handler over flere
+markedsfaser. Til det formål er backtesten (`run_backtest.py`) det
+bedre værktøj, og selv den er historik, ikke en garanti.
 
 ## Ét sidste, vigtigt punkt: repo-synlighed
 

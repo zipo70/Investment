@@ -33,6 +33,7 @@ jobs:
           SAXO_DRY_RUN: ${{ vars.SAXO_DRY_RUN || 'true' }}
           SAXO_MAX_ORDER_AMOUNT: ${{ vars.SAXO_MAX_ORDER_AMOUNT || '25000' }}
           SAXO_MAX_ORDERS_PER_DAY: ${{ vars.SAXO_MAX_ORDERS_PER_DAY || '5' }}
+          SAXO_STRATEGY_CAPITAL: ${{ vars.SAXO_STRATEGY_CAPITAL || '100000' }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}

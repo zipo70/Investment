@@ -24,15 +24,26 @@ Rækkefølge, hver kørsel:
      eksekvér et evt. resultat via order_executor.execute_order() (som
      selv håndhæver guardrails og sender notifikationer)."""
 
+import os
+
 from config import Config
-from trading import db, guardrails, monitor, oauth
+from trading import db, guardrails, monitor, oauth, saxo_api
 from trading.decision import Portfolio, PortfolioPosition, Signal, decide
 from trading.instrument_mapping import MappingError, lookup_uic
 from trading.order_executor import ExecutionError, execute_order
 from notify import notify_order_activity
 
 
-def _portfolio_from_positions(positions_rows: dict) -> Portfolio:
+def _strategy_cap() -> float:
+    """Hvor meget af SIM-kontoen strategien må bruge (kontoens valuta).
+    Default = backtestens startkapital, så positionsstørrelserne matcher."""
+    raw = os.environ.get("SAXO_STRATEGY_CAPITAL", "").strip()
+    return float(raw) if raw else Config().starting_capital
+
+
+def build_portfolio(positions_rows: dict, capital: dict) -> Portfolio:
+    """Portfolio ud fra synkroniserede positioner + Saxo-saldo (allerede
+    begrænset af strategy_capital). Netværksfri."""
     positions = {
         ticker: PortfolioPosition(
             ticker=ticker, uic=row.get("uic"),
@@ -40,15 +51,7 @@ def _portfolio_from_positions(positions_rows: dict) -> Portfolio:
         )
         for ticker, row in positions_rows.items()
     }
-    # TODO: total_value BØR være den faktiske kontoværdi fra Saxo
-    # (GET {API_BASE_URL}/port/v1/balances/me), ikke en tilnærmelse.
-    # Indtil den er koblet på, bruges cfg.starting_capital som et
-    # eksplicit-synligt (og eksplicit forkert) stedfortræder, så det
-    # ikke bliver glemt — sæt IKKE SAXO_DRY_RUN=false før dette er rettet.
-    total_value = Config().starting_capital
-    invested = sum(p.entry_price * p.shares for p in positions.values())
-    cash = total_value - invested
-    return Portfolio(cash=cash, total_value=total_value, positions=positions)
+    return Portfolio(cash=capital["cash"], total_value=capital["total_value"], positions=positions)
 
 
 def run_once():
@@ -60,9 +63,21 @@ def run_once():
     gcfg = guardrails.GuardrailConfig.from_env()
     cfg = Config()
 
+    try:
+        account = saxo_api.get_account(access_token)
+        balance = saxo_api.get_balance(access_token, account)
+    except saxo_api.SaxoApiError as e:
+        notify_order_activity("Kunne ikke hente Saxo-konto/saldo", str(e))
+        raise
+    capital = saxo_api.strategy_capital(balance, _strategy_cap())
+    print(f"Konto {account['account_key']} ({account['currency']}): "
+          f"saldo {balance['total_value']:.0f}, strategi-kapital {capital['total_value']:.0f}, "
+          f"ledig {capital['cash']:.0f}. Dry-run: {gcfg.dry_run}")
+
     with db.connect() as conn:
         try:
-            monitor.poll_once(conn, access_token)
+            result = monitor.poll_once(conn, access_token)
+            print(f"Synkroniseret {result['synced']} positioner.")
         except Exception as e:
             notify_order_activity("Kunne ikke synkronisere Saxo-konto", str(e))
             print(f"Advarsel: poll_once fejlede ({e}) — fortsætter med sidst kendte tilstand.")
@@ -80,7 +95,7 @@ def run_once():
                 last_price=row["last_price"], stop_price=row["stop_price"],
                 external_reference=row["external_reference"],
             )
-            portfolio = _portfolio_from_positions(positions_rows)
+            portfolio = build_portfolio(positions_rows, capital)
             proposal = decide(signal, portfolio, cfg)
 
             if proposal is None:
@@ -101,14 +116,17 @@ def run_once():
             try:
                 execute_order(
                     conn, access_token, proposal,
-                    uic=mapping["uic"], asset_type=mapping["asset_type"], gcfg=gcfg,
+                    uic=mapping["uic"], asset_type=mapping["asset_type"],
+                    account=account, last_price=signal.last_price, gcfg=gcfg,
                 )
-            except (guardrails.GuardrailViolation, ExecutionError):
-                continue  # allerede logget + notificeret inde i execute_order()
+            except (guardrails.GuardrailViolation, ExecutionError, saxo_api.SaxoApiError) as e:
+                print(f"{signal.ticker}: {e}")
+                continue  # logget + notificeret inde i execute_order()
 
-            # Opdatér den lokale positions-visning så EVENTUELLE
-            # efterfølgende signaler i samme kørsel (usandsynligt, men
-            # billigt at være korrekt om) ser den nye position.
+            # Køb binder kapital — træk fra, så næste signal i samme kørsel
+            # ikke regner med penge der allerede er brugt.
+            if proposal.direction == "KØB" and proposal.notional:
+                capital["cash"] = max(0.0, capital["cash"] - proposal.notional)
             positions_rows = db.load_positions(conn)
 
 

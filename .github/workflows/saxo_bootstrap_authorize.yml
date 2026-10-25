@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       code:
-        description: "'code'-værdien fra adresselinjen efter Saxo-login"
+        description: "HELE adressen fra Safari efter Saxo-login (eller kun code-værdien)"
         required: true
         type: string
 
@@ -31,7 +31,8 @@ jobs:
           SAXO_REDIRECT_URI: ${{ vars.SAXO_REDIRECT_URI || 'http://localhost:12321/callback' }}
           SAXO_TOKEN_BACKEND: github_secret
           GH_PAT_FOR_SECRETS: ${{ secrets.GH_PAT_FOR_SECRETS }}
-        run: python -m trading.oauth --exchange-code "${{ inputs.code }}"
+          SAXO_AUTH_CODE: ${{ inputs.code }}
+        run: python -m trading.oauth --exchange-code "$SAXO_AUTH_CODE"
 
       - name: Færdig
         run: |

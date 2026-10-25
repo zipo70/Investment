@@ -138,15 +138,37 @@ def build_authorization_url(state: str = None) -> tuple:
     return f"{AUTH_URL}?{urllib.parse.urlencode(params)}", state
 
 
+def extract_code(raw: str) -> str:
+    """Accepterer både den rene code og HELE adressen fra Safari efter
+    redirect (fx "http://localhost:12321/callback?code=...&state=..."), så
+    man på telefonen bare kan kopiere hele adresselinjen i stedet for at
+    klippe koden ud. Netværksfri."""
+    raw = (raw or "").strip().strip('"').strip("'")
+    if "code=" in raw:
+        query = urllib.parse.urlparse(raw).query or raw.split("?", 1)[-1]
+        codes = urllib.parse.parse_qs(query).get("code")
+        if codes:
+            return codes[0].strip()
+    return raw
+
+
+def _diagnostics(code: str) -> str:
+    """Sikre fejlsøgningsoplysninger (ingen hemmeligheder vises)."""
+    cid = CLIENT_ID or ""
+    return (f"redirect_uri brugt: {REDIRECT_URI!r} (skal være IDENTISK med den på Saxo-app'en) | "
+            f"client_id: {len(cid)} tegn, slutter på '...{cid[-4:]}' | "
+            f"client_secret sat: {'ja' if CLIENT_SECRET else 'NEJ'} | "
+            f"code: {len(code)} tegn")
+
+
 def exchange_code_for_tokens(code: str) -> dict:
     """Bytter en (manuelt indhentet) authorization-code til det første
-    access+refresh-token-par og gemmer det via token_store (backend
-    styret af SAXO_TOKEN_BACKEND — se token_store.py). Bruges både af
-    run_first_time_authorization() (browser+lokal-server-flowet) og af
-    .github/workflows/saxo_bootstrap_authorize.yml's
-    'python -m trading.oauth --exchange-code'-kald (det telefon-/
-    GitHub-only-venlige flow, hvor koden kopieres manuelt fra
-    adresselinjen — se build_authorization_url())."""
+    access+refresh-token-par og gemmer det via token_store. Bruges både af
+    run_first_time_authorization() og af saxo_bootstrap_authorize.yml.
+
+    Prøver først med klient-oplysninger i POST-body; ved HTTP 401 prøves
+    én gang med HTTP Basic-auth (nogle OAuth-servere kræver den form)."""
+    code = extract_code(code)
     payload = {
         "grant_type": "authorization_code",
         "code": code,
@@ -155,7 +177,23 @@ def exchange_code_for_tokens(code: str) -> dict:
     }
     if CLIENT_SECRET:
         payload["client_secret"] = CLIENT_SECRET
-    tokens = _exchange(payload)
+    try:
+        tokens = _exchange(payload)
+    except OAuthError as first:
+        if "HTTP 401" not in str(first) or not CLIENT_SECRET:
+            raise OAuthError(f"{first}\n{_diagnostics(code)}")
+        basic_payload = {k: v for k, v in payload.items() if k not in ("client_id", "client_secret")}
+        resp = requests.post(TOKEN_URL, data=basic_payload, auth=(CLIENT_ID, CLIENT_SECRET), timeout=20)
+        if resp.status_code >= 300:
+            raise OAuthError(
+                f"Token-endpoint afviste koden (HTTP {resp.status_code}) både med "
+                f"body- og Basic-auth: {resp.text[:300]}\n{_diagnostics(code)}\n"
+                "Typiske årsager: koden er udløbet (brug den inden for ca. et minut) "
+                "eller allerede brugt, redirect_uri matcher ikke app'en, eller "
+                "SAXO_CLIENT_ID/SECRET hører til en anden Saxo-app."
+            )
+        tokens = resp.json()
+        tokens["obtained_at"] = time.time()
     token_store.save_tokens(tokens)
     return tokens
 
