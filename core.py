@@ -943,6 +943,10 @@ def get_fundamental_data(ticker):
         free_cashflow = info.get("freeCashflow")
         fcf_yield_pct = (free_cashflow / market_cap * 100.0) if (free_cashflow is not None and market_cap) else None
         insiders = info.get("heldPercentInsiders")
+        # Kun til GEICO-profilen (compute_geico_profile) — indgår IKKE i
+        # fundamental_score. Hentes fra samme info-opslag, så ingen ekstra kald.
+        roa = info.get("returnOnAssets")
+        operating_margin = info.get("operatingMargins")
 
         subscores, weights, triggers = [], [], []
 
@@ -1043,6 +1047,7 @@ def get_fundamental_data(ticker):
             "roe": roe, "debt_to_equity": debt_to_equity, "sector": sector,
             "forward_pe": forward_pe, "price_to_sales": price_to_sales,
             "fcf_yield_pct": fcf_yield_pct, "insiders_pct": insiders,
+            "roa": roa, "operating_margin": operating_margin,
             "next_earnings_date": next_earnings_date,
             "fundamental_score": fundamental_score, "fundamental_triggers": triggers,
         }
@@ -1228,6 +1233,153 @@ def get_aktieguld_data(ticker: str, fundamental: dict) -> dict:
         }
     except Exception as e:
         return {"ok": False, "reason": f"kunne ikke beregne Aktieguld-point: {e}"}
+
+
+# ============================================================================
+# --- GEICO-profil (info — påvirker IKKE komposit-scoren) ---
+# ============================================================================
+#
+# Tilføjet efter ønske fra bruger (Jacobi, 2026-10-25): en screening inspireret
+# af Warren Buffetts GEICO-investering (1951). Spørgsmålet den besvarer er
+# "ligner denne aktie det, Buffett så i GEICO?" — ikke "skal den købes".
+#
+# GEICO-trækkene og de Yahoo-nøgletal der bruges som stedfortrædere:
+#   1. Effektivitet/omkostningsfordel → afkast på aktiver (ROA) + ROE.
+#      Lavprisaktører (fx Costco) har lav margin men høj kapitaleffektivitet,
+#      derfor ROA frem for overskudsgrad.
+#   2. Voksende forretning           → omsætningsvækst (proxy for kundevækst)
+#   3. Finansiel styrke              → lav gæld/egenkapital + positivt frit cash flow
+#   4. Ledelse med egne penge i spil → insiderejerskab
+#   5. Billig                        → forward P/E + frit cash flow-afkast
+#   6. Overset/upopulær              → få analytikere + kurs langt fra flerårs-top
+#
+# BEVIDSTE BEGRÆNSNINGER:
+#   - "Simpel, forståelig forretning" og "konkret konkurrencefordel" kan ikke
+#     måles med nøgletal — det skal man selv vurdere.
+#   - Ingen sektor-justering: en bank og et softwarehus vurderes på samme skala.
+#   - Punkt 6 trækker i MODSAT retning af swing-strategiens momentum-logik.
+#     Det er tilsigtet (GEICO var upopulær), men betyder at Top 10 — som
+#     forudfiltrerer på kurs over 200-dages snit — sjældent viser de stærkeste
+#     GEICO-profiler. Se README/BACKLOG for en evt. separat scanning.
+#
+# Seks søjler à 0-100, vægtet ligeligt; manglende data springes over (ikke
+# straffet). Mindst 3 søjler skal kunne beregnes, ellers ok=False.
+
+GEICO_STRONG_THRESHOLD = 70   # "Stærk GEICO-profil"
+GEICO_PARTIAL_THRESHOLD = 55  # "Delvis GEICO-profil"
+GEICO_MIN_PILLARS = 3
+
+
+def _clamp(x: float) -> float:
+    return max(0.0, min(100.0, x))
+
+
+def _lin(value: float, worst: float, best: float) -> float:
+    """Lineær skala: `worst` → 0 point, `best` → 100 point (virker også
+    når best < worst, fx P/E hvor lavt er bedst)."""
+    if best == worst:
+        return 50.0
+    return _clamp((value - worst) / (best - worst) * 100.0)
+
+
+def _avg(values):
+    vals = [v for v in values if v is not None]
+    return sum(vals) / len(vals) if vals else None
+
+
+def compute_geico_profile(fundamental: dict, analyst: dict, long_term: dict) -> dict:
+    """Beregner GEICO-profilen ud fra allerede hentede data — ingen
+    netværkskald, så den kan unit-testes og ikke øger risikoen for
+    rate-limitering. Se sektionskommentaren ovenfor for metode og forbehold."""
+    fa = fundamental if (fundamental or {}).get("ok") else {}
+    an = analyst if (analyst or {}).get("ok") else {}
+    lt = long_term if (long_term or {}).get("ok") else {}
+
+    pillars, triggers = {}, []
+
+    # 1. Effektivitet — ROA 0% → 0, 10% → 100; ROE 0% → 0, 20% → 100
+    roa, roe = fa.get("roa"), fa.get("roe")
+    eff = _avg([
+        _lin(roa * 100, 0, 10) if roa is not None else None,
+        _lin(roe * 100, 0, 20) if roe is not None else None,
+    ])
+    if eff is not None:
+        pillars["Effektivitet"] = eff
+        if eff >= 70:
+            parts = []
+            if roa is not None: parts.append(f"ROA {roa*100:.0f}%")
+            if roe is not None: parts.append(f"ROE {roe*100:.0f}%")
+            triggers.append(f"Høj kapitaleffektivitet ({', '.join(parts)})")
+
+    # 2. Vækst — 0% → 30, 15%+ → 100 (krympende forretning → under 30)
+    rg = fa.get("revenue_growth")
+    if rg is not None:
+        g = _clamp(30 + rg * 100 / 15 * 70)
+        pillars["Vækst"] = g
+        if rg >= 0.10:
+            triggers.append(f"Voksende forretning (omsætning {rg*100:+.0f}%)")
+
+    # 3. Finansiel styrke — D/E 0% → 100, 150% → 0; FCF positivt → 100, negativt → 0
+    de, fcf = fa.get("debt_to_equity"), fa.get("fcf_yield_pct")
+    strength = _avg([
+        _lin(de, 150, 0) if de is not None else None,
+        (100.0 if fcf > 0 else 0.0) if fcf is not None else None,
+    ])
+    if strength is not None:
+        pillars["Finansiel styrke"] = strength
+        if strength >= 75:
+            triggers.append("Solid balance (lav gæld og positivt frit cash flow)")
+
+    # 4. Ledelse med egne penge i spil — insidere 0% → 0, 10%+ → 100
+    ins = fa.get("insiders_pct")
+    if ins is not None:
+        pillars["Ejerledelse"] = _lin(ins * 100, 0, 10)
+        if ins >= 0.05:
+            triggers.append(f"Ledelsen ejer selv en stor andel ({ins*100:.0f}%)")
+
+    # 5. Billig — forward P/E 35 → 0, 10 → 100; FCF-afkast 0% → 0, 8% → 100
+    fpe = fa.get("forward_pe")
+    cheap = _avg([
+        _lin(fpe, 35, 10) if (fpe is not None and fpe > 0) else None,
+        _lin(fcf, 0, 8) if fcf is not None else None,
+    ])
+    if cheap is not None:
+        pillars["Billig"] = cheap
+        if cheap >= 70:
+            fpe_txt = f"forward P/E {fpe:.1f}" if (fpe is not None and fpe > 0) else ""
+            fcf_txt = f"FCF-afkast {fcf:.1f}%" if fcf is not None else ""
+            triggers.append("Lav værdiansættelse (" + ", ".join(t for t in (fpe_txt, fcf_txt) if t) + ")")
+
+    # 6. Overset — analytikere 25+ → 0, ≤3 → 100; kurs ved top → 0, −40% → 100
+    n_an, from_high = an.get("num_analysts"), lt.get("pct_from_period_high")
+    overlooked = _avg([
+        _lin(n_an, 25, 3) if n_an is not None else None,
+        _lin(from_high, 0, -40) if from_high is not None else None,
+    ])
+    if overlooked is not None:
+        pillars["Overset"] = overlooked
+        if overlooked >= 70:
+            parts = []
+            if n_an is not None: parts.append(f"{n_an} analytikere")
+            if from_high is not None: parts.append(f"{from_high:+.0f}% fra flerårs-top")
+            triggers.append(f"Overset af markedet ({', '.join(parts)})")
+
+    if len(pillars) < GEICO_MIN_PILLARS:
+        return {"ok": False, "reason": f"for få nøgletal ({len(pillars)} af 6 søjler kunne beregnes)",
+                "pillars": pillars}
+
+    score = sum(pillars.values()) / len(pillars)
+    if score >= GEICO_STRONG_THRESHOLD:
+        label = "Stærk GEICO-profil"
+    elif score >= GEICO_PARTIAL_THRESHOLD:
+        label = "Delvis GEICO-profil"
+    else:
+        label = "Svag GEICO-profil"
+
+    return {
+        "ok": True, "geico_score": score, "label": label,
+        "pillars": pillars, "pillars_used": len(pillars), "geico_triggers": triggers,
+    }
 
 
 # ============================================================================
@@ -1589,10 +1741,11 @@ def analyze_ticker(ticker: str):
     upside, upside_kilde = compute_upside(ta, analyst)
     plan = compute_trade_plan(df, ta["last_price"], cfg)
     recommendation = compute_recommendation(ta, long_term, fundamental, stocktwits, plan, composite)
+    geico = compute_geico_profile(fundamental, analyst, long_term)  # info, ikke i komposit
     return {
         "ok": True, "ta": ta, "long_term": long_term, "fundamental": fundamental,
         "analyst": analyst, "stocktwits": stocktwits, "reddit": reddit,
-        "aktieguld": aktieguld,
+        "aktieguld": aktieguld, "geico": geico,
         "composite_score": composite, "popularity_score": pop,
         "upside_pct": upside, "upside_kilde": upside_kilde,
         "plan": plan, "recommendation": recommendation,
@@ -1657,11 +1810,12 @@ def find_top_candidates(top_n: int = 10):
         plan = compute_trade_plan(df, ta["last_price"], cfg)
         recommendation = compute_recommendation(ta, long_term, fundamental, stocktwits, plan, composite)
         meta = get_ticker_meta(ticker)
+        geico = compute_geico_profile(fundamental, analyst, long_term)  # info, ikke i komposit
         results.append({
             "ticker": ticker, "region": region_of(ticker), "ta": ta,
             "long_term": long_term, "fundamental": fundamental,
             "analyst": analyst, "stocktwits": stocktwits, "reddit": reddit,
-            "aktieguld": aktieguld,
+            "aktieguld": aktieguld, "geico": geico,
             "composite_score": composite, "popularity_score": pop,
             "upside_pct": upside, "upside_kilde": upside_kilde,
             "short_name": analyst.get("short_name") or ticker, "plan": plan, "meta": meta,

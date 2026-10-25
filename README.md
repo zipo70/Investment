@@ -316,6 +316,30 @@ badge'en helt i stedet for at vise et misvisende tal. Sektor-kortet
 genberegnes højst hvert 1. time (cachet), da 3-måneders afkast alligevel
 ikke ændrer sig fra minut til minut.
 
+### GEICO-profil — info (påvirker IKKE komposit-scoren)
+
+Inspireret af Warren Buffetts GEICO-investering (1951): "ligner denne aktie
+det, Buffett så i GEICO?". Seks søjler à 0-100, vægtet ligeligt, beregnet
+fra nøgletal der allerede hentes (ingen ekstra netværkskald):
+
+| Søjle | GEICO-træk | Nøgletal (Yahoo) |
+|---|---|---|
+| Effektivitet | Laveste omkostninger | ROA + ROE |
+| Vækst | Voksende kundebase | Omsætningsvækst |
+| Finansiel styrke | Robust balance | Gæld/egenkapital + frit cash flow |
+| Ejerledelse | Ledelse med egne penge i spil | Insiderejerskab |
+| Billig | Lav pris | Forward P/E + FCF-afkast |
+| Overset | Få kiggede på den | Antal analytikere + afstand til flerårs-top |
+
+Mærkat: ≥70 = Stærk, 55-69 = Delvis, under 55 = Svag GEICO-profil. Vises
+under "Detaljer" i Watchlist og Top 10, og Top 10 kan sorteres efter den.
+
+**Forbehold:** "Simpel forretning" og "reel konkurrencefordel" kan ikke måles
+med nøgletal. Ingen sektor-justering. "Overset" trækker modsat
+momentum-strategien, så Top 10 (som kun tager aktier over 200-dages snit
+med) viser sjældent de stærkeste GEICO-profiler — se BACKLOG.md #8.
+Logik: `core.py:compute_geico_profile`, tests: `tests/test_geico.py`.
+
 ### Kursmønstre — cup-with-handle, double top/bottom, triangler, head & shoulders
 
 Efter bruger-ønske ("golden cross og cup with handle og sådan noget",

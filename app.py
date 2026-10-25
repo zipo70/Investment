@@ -88,6 +88,25 @@ def _render_aktieguld(aktieguld: dict):
     st.caption(f"Samlet Aktieguld-score: {aktieguld['aktieguld_score']:.0f}/100 (vægter 20% i komposit-scoren)")
 
 
+def _render_geico(geico: dict):
+    """GEICO-profil (inspireret af Buffetts GEICO-investering 1951) — ren
+    info, indgår IKKE i komposit-scoren. Se core.py:compute_geico_profile
+    for metode og forbehold."""
+    st.markdown("**🦎 GEICO-profil** *(ligner aktien det, Buffett så i GEICO? — info, ikke i scoren)*")
+    if not geico or not geico.get("ok"):
+        st.caption(f"Ingen data ({(geico or {}).get('reason', 'ukendt årsag')})")
+        return
+    ikon = {"Stærk GEICO-profil": "🟢", "Delvis GEICO-profil": "🟡"}.get(geico["label"], "⚪")
+    linjer = [f"{navn}: {v:.0f}/100" for navn, v in geico["pillars"].items()]
+    linjer.extend(geico.get("geico_triggers") or [])
+    st.markdown("\n".join(f"- {l}" for l in linjer))
+    st.caption(
+        f"{ikon} {geico['label']}: {geico['geico_score']:.0f}/100 "
+        f"({geico['pillars_used']} af 6 søjler). Måler ikke om forretningen er simpel "
+        f"eller har en reel konkurrencefordel — det skal du selv vurdere."
+    )
+
+
 def _render_sector_signal(sector: str):
     """Info-badge om sektor-rotation — påvirker IKKE komposit-scoren (se
     core.py:get_sector_signal for metode/forbehold). Udelades helt hvis
@@ -142,6 +161,11 @@ TOP10_SORT_OPTIONS = {
         lambda c: (c.get("aktieguld", {}).get("aktieguld_score")
                    if c.get("aktieguld", {}).get("ok") and c.get("aktieguld", {}).get("aktieguld_score") is not None
                    else float("-inf")),
+        True,
+    ),
+    "GEICO-profil (høj → lav)": (
+        lambda c: (c.get("geico", {}).get("geico_score")
+                   if c.get("geico", {}).get("ok") else float("-inf")),
         True,
     ),
     "Region (A-Å)": (lambda c: c["region"], False),
@@ -360,6 +384,7 @@ with tab_watch:
                         elif fa.get("ok") is False:
                             st.caption(f"Fundamentale nøgletal: ingen data ({fa.get('reason', '?')})")
                         _render_aktieguld(result.get("aktieguld", {}))
+                        _render_geico(result.get("geico", {}))
                         _render_sector_signal(fa.get("sector"))
                         _render_next_earnings(fa)
                         a = result["analyst"]
@@ -479,6 +504,7 @@ with tab_top10:
                     elif fa.get("ok") is False:
                         st.caption(f"Fundamentale nøgletal: ingen data ({fa.get('reason', '?')})")
                     _render_aktieguld(c.get("aktieguld", {}))
+                    _render_geico(c.get("geico", {}))
                     _render_sector_signal(fa.get("sector"))
                     _render_next_earnings(fa)
                     a = c["analyst"]

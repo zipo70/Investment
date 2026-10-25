@@ -101,3 +101,14 @@ gennemsnitlige kursmål — det er uafhængigt af komposit-scoren...".
 selve scoren — kræver en ny vægtningsdiskussion) **eller Mulighed C**
 (skjul/nedton kandidater med negativ upside i Top 10) — det er hurtigt at
 lave om, nu hvor grundstrukturen er der.
+
+## Åbne idéer
+
+### 8. Separat "GEICO-scan" uden trendfilter — IKKE LAVET (afventer beslutning)
+GEICO-profilen (2026-10-25) vises i Watchlist og Top 10, men Top 10
+forudfiltrerer på kurs over 200-dages snit. Aktier der er faldet og overset —
+netop GEICO-typen — slipper derfor sjældent igennem. En separat scanning af
+hele universet sorteret på GEICO-score ville kræve et nøgletals-opslag pr.
+ticker (~93 kald), dvs. øget risiko for rate-limitering (jf. #3). Kan laves
+som en langsom, cachet fane eller som et ugentligt GitHub Actions-job.
+
