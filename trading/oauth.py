@@ -273,7 +273,12 @@ if __name__ == "__main__":
             print("Brug: python -m trading.oauth --exchange-code <code>")
             sys.exit(1)
         code = sys.argv[idx + 1]
-        exchange_code_for_tokens(code)
+        try:
+            exchange_code_for_tokens(code)
+        except Exception as e:  # vis fejlen som GitHub-annotation (læsbar via API)
+            msg = f"{type(e).__name__}: {e}".replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+            print(f"::error title=Saxo-autorisation fejlede::{msg[:3000]}")
+            sys.exit(1)
         print("Token hentet og gemt via den konfigurerede token_store-backend.")
     else:
         print(
