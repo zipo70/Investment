@@ -86,10 +86,17 @@ def download(tickers: list[str], batch: int = 80) -> tuple[pd.DataFrame, pd.Data
                 pass
         print(f"  hentet {min(i + batch, len(tickers))}/{len(tickers)} · med data: {len(closes)}")
         time.sleep(2)
-    C = pd.DataFrame(closes).sort_index()
-    O = pd.DataFrame(opens).reindex(C.index)
-    C.index = pd.DatetimeIndex(C.index).tz_localize(None)
-    O.index = C.index
+    C = pd.DataFrame(closes)
+    O = pd.DataFrame(opens)
+    # Børser i forskellige tidszoner kan give flere rækker pr. kalenderdag —
+    # saml til én række pr. dato, og udfyld korte helligdagshuller.
+    for df in (C, O):
+        idx = pd.DatetimeIndex(df.index)
+        df.index = (idx.tz_localize(None) if idx.tz is not None else idx).normalize()
+    C = C.groupby(level=0).last().sort_index()
+    O = O.groupby(level=0).first().reindex(C.index)
+    C = C.ffill(limit=5)
+    O = O.fillna(C)
     return O, C
 
 
@@ -225,11 +232,11 @@ def main():
 
     # 2) Japan
     print("Japan: henter kurser...")
-    Oj, Cj = download(JAPAN + ["1306.T"])
-    topix = Cj.pop("1306.T")
-    Oj = Oj.drop(columns=["1306.T"], errors="ignore")
+    Oj, Cj = download(JAPAN + ["^N225"])
+    topix = Cj.pop("^N225")
+    Oj = Oj.drop(columns=["^N225"], errors="ignore")
     results.append(evaluate("Japan (~65 største, dagens liste)", Oj, Cj, topix, None,
-                            {"indeks": "TOPIX-ETF 1306.T", "med_kursdata": Cj.shape[1]}))
+                            {"indeks": "Nikkei 225 (kursindeks, ekskl. udbytte)", "med_kursdata": Cj.shape[1]}))
 
     # 3) Vores univers (samme motor)
     from universe import full_universe, BENCHMARK
