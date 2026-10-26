@@ -1,44 +1,46 @@
 {
-  "genereret_utc": "2026-10-25T14:21:45+00:00",
+  "genereret_utc": "2026-10-26T11:32:59+00:00",
   "stats": {
     "universe_size": 79,
     "skipped_data": 1,
-    "skipped_trend": 29,
+    "skipped_trend": 28,
     "shortlist_size": 10,
     "high_skip_rate": false,
-    "next_rebalance": "2026-10-26",
-    "is_rebalance_day": false
+    "next_rebalance": "2027-01-21",
+    "is_rebalance_day": true
   },
   "kandidater": [
     {
       "ticker": "MAERSK-B.CO",
       "model_a_rank": 1,
-      "momentum_6_1_pct": 61.8,
+      "momentum_6_1_pct": 57.5,
       "navn": "A.P. Møller - Mærsk B A/S",
       "region": "Norden",
       "valuta": "DKK",
       "anbefaling": "KØB",
-      "komposit": 49.8,
-      "ta_score": 30.0,
-      "fundamental_score": 59.8,
+      "komposit": 52.7,
+      "ta_score": 50.0,
+      "fundamental_score": 59.7,
       "popularitet": 36.8,
       "aktieguld": 77.4,
-      "geico_score": 62.8,
+      "geico_score": 62.1,
       "geico_label": "Delvis GEICO-profil",
       "geico_triggers": [
         "Voksende forretning (omsætning +20%)",
         "Solid balance (lav gæld og positivt frit cash flow)",
         "Ledelsen ejer selv en stor andel (31%)"
       ],
-      "upside_pct": -11.9,
-      "kurs": 22870.0,
-      "stop": 19439.5,
+      "upside_pct": -14.2,
+      "kurs": 23500.0,
+      "stop": 19975.0,
       "stop_pct": -15.0,
       "stop_kilde": "−15% fra indgang (model A)",
       "sell_score": 0,
       "sell_triggers": [],
       "naeste_regnskab": "2026-11-05",
-      "ta_triggers": []
+      "ta_triggers": [
+        "Cup-with-handle-mønster, 41% dyb kop, tæt på/over randen"
+      ]
     },
     {
       "ticker": "INTC",
@@ -106,40 +108,38 @@
     {
       "ticker": "GMAB.CO",
       "model_a_rank": 4,
-      "momentum_6_1_pct": 32.6,
+      "momentum_6_1_pct": 33.4,
       "navn": "Genmab A/S",
       "region": "Norden",
       "valuta": "DKK",
       "anbefaling": "KØB",
-      "komposit": 67.7,
-      "ta_score": 85.0,
+      "komposit": 63.4,
+      "ta_score": 55.0,
       "fundamental_score": 56.1,
       "popularitet": 89.7,
       "aktieguld": 35.8,
-      "geico_score": 56.5,
-      "geico_label": "Delvis GEICO-profil",
+      "geico_score": 53.2,
+      "geico_label": "Svag GEICO-profil",
       "geico_triggers": [
         "Høj kapitaleffektivitet (ROA 9%, ROE 14%)",
         "Voksende forretning (omsætning +25%)"
       ],
-      "upside_pct": 5.0,
-      "kurs": 2644.0,
-      "stop": 2247.4,
+      "upside_pct": -5.4,
+      "kurs": 2997.0,
+      "stop": 2547.45,
       "stop_pct": -15.0,
       "stop_kilde": "−15% fra indgang (model A)",
       "sell_score": 0,
       "sell_triggers": [],
       "naeste_regnskab": "2026-11-05",
       "ta_triggers": [
-        "Nyt 52-ugers højeste for 1 dage siden",
-        "Cup-with-handle-mønster, 35% dyb kop, tæt på/over randen",
-        "Ascending triangle — udbrud over modstand (2529.00)"
+        "Nyt 52-ugers højeste for 0 dage siden"
       ]
     },
     {
       "ticker": "SAP.DE",
       "model_a_rank": 5,
-      "momentum_6_1_pct": 28.4,
+      "momentum_6_1_pct": 29.9,
       "navn": "SAP SE                        I",
       "region": "Europa",
       "valuta": "EUR",
@@ -149,7 +149,7 @@
       "fundamental_score": 80.0,
       "popularitet": 87.1,
       "aktieguld": 78.7,
-      "geico_score": 75.5,
+      "geico_score": 75.3,
       "geico_label": "Stærk GEICO-profil",
       "geico_triggers": [
         "Høj kapitaleffektivitet (ROA 10%, ROE 18%)",
@@ -157,9 +157,9 @@
         "Solid balance (lav gæld og positivt frit cash flow)",
         "Ledelsen ejer selv en stor andel (11%)"
       ],
-      "upside_pct": 10.5,
-      "kurs": 214.4,
-      "stop": 182.24,
+      "upside_pct": 9.7,
+      "kurs": 215.95,
+      "stop": 183.56,
       "stop_pct": -15.0,
       "stop_kilde": "−15% fra indgang (model A)",
       "sell_score": 0,
@@ -172,7 +172,7 @@
     {
       "ticker": "ASML.AS",
       "model_a_rank": 6,
-      "momentum_6_1_pct": 26.2,
+      "momentum_6_1_pct": 24.7,
       "navn": "ASML HOLDING",
       "region": "Europa",
       "valuta": "EUR",
@@ -182,16 +182,16 @@
       "fundamental_score": 84.6,
       "popularitet": 90.9,
       "aktieguld": 84.4,
-      "geico_score": 58.6,
+      "geico_score": 58.5,
       "geico_label": "Delvis GEICO-profil",
       "geico_triggers": [
         "Høj kapitaleffektivitet (ROA 18%, ROE 66%)",
         "Voksende forretning (omsætning +55%)",
         "Solid balance (lav gæld og positivt frit cash flow)"
       ],
-      "upside_pct": 49.1,
-      "kurs": 1407.2,
-      "stop": 1196.12,
+      "upside_pct": 48.6,
+      "kurs": 1411.8,
+      "stop": 1200.03,
       "stop_pct": -15.0,
       "stop_kilde": "−15% fra indgang (model A)",
       "sell_score": 0,
