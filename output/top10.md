@@ -1,20 +1,20 @@
-# Top 10 — 2026-10-28 11:38 UTC
+# Top 10 — 2026-10-29 11:44 UTC
 
-Univers: 79 · data-fejl: 1 · uden optrend: 31 · shortlist: 10
+Univers: 79 · data-fejl: 1 · uden optrend: 30 · shortlist: 10
 
 Model A · næste rebalancering: 2027-01-21 · i dag rebalanceringsdag: False
 
 | # | Ticker | Navn | Model A | Momentum 6-1 | Komposit (info) | GEICO | Kurs | Stop −15 % | Regnskab |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | MAERSK-B.CO | A.P. Møller - Mærsk B A/S | KØB | 62.2% | 49.8 | 62.1 | 23510.0 | 19983.5 (-15.0%) | 2026-11-05 |
-| 2 | GMAB.CO | Genmab A/S | KØB | 40.0% | 64.3 | 53.6 | 3001.0 | 2550.85 (-15.0%) | 2026-11-05 |
-| 3 | INTC | Intel Corporation | KØB | 37.3% | 53.9 | 56.5 | 93.74 | 79.68 (-15.0%) | 2026-10-29 |
-| 4 | ASML.AS | ASML HOLDING | KØB | 30.4% | 75.6 | 57.0 | 1488.2 | 1264.97 (-15.0%) | 2026-10-14 |
-| 5 | CRM | Salesforce, Inc. | KØB | 25.9% | 70.3 | 63.9 | 240.89 | 204.76 (-15.0%) | 2026-12-02 |
-| 6 | SAP.DE | SAP SE                        I | HOLD | 25.8% | 70.4 | 76.2 | 209.4 | 177.99 (-15.0%) | 2026-10-21 |
-| 7 | AAPL | Apple Inc. | HOLD | 25.2% | 77.4 | 50.7 | 347.1 | 295.04 (-15.0%) | 2026-11-02 |
-| 8 | CSCO | Cisco Systems, Inc. | HOLD | 23.3% | 71.3 | 55.7 | 111.38 | 94.67 (-15.0%) | 2026-11-12 |
-| 9 | JNJ | Johnson & Johnson | HOLD | 20.7% | 66.0 | 47.5 | 268.73 | 228.42 (-15.0%) | 2026-10-13 |
-| 10 | V | Visa Inc. | HOLD | 19.4% | 81.0 | 53.2 | 401.86 | 341.58 (-15.0%) | 2027-01-26 |
+| 1 | MAERSK-B.CO | A.P. Møller - Mærsk B A/S | KØB | 56.8% | 49.9 | 62.3 | 23560.0 | 20026.0 (-15.0%) | 2026-11-05 |
+| 2 | GMAB.CO | Genmab A/S | KØB | 38.6% | 69.1 | 49.9 | 3788.0 | 3219.8 (-15.0%) | 2026-11-05 |
+| 3 | CRM | Salesforce, Inc. | KØB | 24.9% | 70.3 | 63.8 | 242.11 | 205.79 (-15.0%) | 2026-12-02 |
+| 4 | SAP.DE | SAP SE                        I | KØB | 24.3% | 70.4 | 76.3 | 208.3 | 177.06 (-15.0%) | 2026-10-21 |
+| 5 | ASML.AS | ASML HOLDING | KØB | 22.5% | 75.6 | 57.1 | 1486.2 | 1263.27 (-15.0%) | 2026-10-14 |
+| 6 | INTC | Intel Corporation | HOLD | 22.4% | 53.8 | 56.2 | 95.53 | 81.2 (-15.0%) | 2026-10-29 |
+| 7 | AAPL | Apple Inc. | HOLD | 22.1% | 77.4 | 50.9 | 343.83 | 292.26 (-15.0%) | 2026-11-02 |
+| 8 | MSFT | Microsoft Corporation | HOLD | 20.4% | 78.1 | 53.6 | 531.01 | 451.36 (-15.0%) | 2027-01-27 |
+| 9 | CSCO | Cisco Systems, Inc. | HOLD | 19.8% | 71.4 | 55.9 | 110.29 | 93.75 (-15.0%) | 2026-11-12 |
+| 10 | JNJ | Johnson & Johnson | HOLD | 19.0% | 61.0 | 47.2 | 271.04 | 230.38 (-15.0%) | 2026-10-13 |
 
 Research-værktøj, ikke finansiel rådgivning.
