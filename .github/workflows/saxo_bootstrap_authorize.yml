@@ -9,7 +9,8 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
+  actions: write
 
 jobs:
   bootstrap:
@@ -34,7 +35,22 @@ jobs:
           SAXO_AUTH_CODE: ${{ inputs.code }}
         run: python -m trading.oauth --exchange-code "$SAXO_AUTH_CODE"
 
+      - name: Fjern kill switch (nyt token = løst årsag)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -f trading/state/KILL_SWITCH ]; then
+            git rm -q trading/state/KILL_SWITCH
+            git commit -m "Saxo: ny autorisation — kill switch fjernet [skip ci]"
+            for i in 1 2 3; do git pull --rebase && git push && break; sleep 5; done
+          fi
+
+      - name: Start første keepalive med det samme
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run saxo_keepalive.yml -R "${{ github.repository }}" || true
+
       - name: Færdig
         run: |
           echo "Token hentet og gemt som det krypterede secret SAXO_TOKENS_JSON."
-          echo "trading_execution.yml kan nu køres."
+          echo "Kill switch fjernet; keepalive holder nu tokenet i live automatisk."

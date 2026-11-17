@@ -280,6 +280,22 @@ if __name__ == "__main__":
             print(f"::error title=Saxo-autorisation fejlede::{msg[:3000]}")
             sys.exit(1)
         print("Token hentet og gemt via den konfigurerede token_store-backend.")
+    elif "--keepalive" in sys.argv:
+        # Kaldes af saxo_keepalive.yml hvert ~20. minut døgnet rundt, så
+        # refresh-tokenet (SIM: lever ca. 1 time) aldrig når at udløbe.
+        # Ingen kill switch / sms her: fejl vises kun som advarsel i loggen.
+        tokens = token_store.load_tokens()
+        if tokens is None:
+            print("::warning title=Saxo keepalive::Intet token gemt — kør 'Saxo — første-gangs autorisation'.")
+            sys.exit(0)
+        try:
+            new = refresh_access_token(tokens)
+            print(f"Token fornyet (access gyldig {new.get('expires_in')} s, "
+                  f"refresh {new.get('refresh_token_expires_in')} s).")
+        except Exception as e:
+            msg = f"{type(e).__name__}: {e}".replace("\r", "").replace("\n", " ")[:500]
+            print(f"::warning title=Saxo keepalive fejlede (token udløbet? kør autorisation igen)::{msg}")
+            sys.exit(0)
     else:
         print(
             "Brug:\n"
