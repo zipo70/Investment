@@ -1,20 +1,20 @@
-# Top 10 — 2026-11-23 16:28 UTC
+# Top 10 — 2026-11-24 16:24 UTC
 
-Univers: 79 · data-fejl: 1 · uden optrend: 36 · shortlist: 10
+Univers: 79 · data-fejl: 1 · uden optrend: 37 · shortlist: 10
 
 Model A · næste rebalancering: 2027-01-21 · i dag rebalanceringsdag: False
 
 | # | Ticker | Navn | Model A | Momentum 6-1 | Komposit (info) | GEICO | Kurs | Stop −15 % | Regnskab |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | GMAB.CO | Genmab A/S | KØB | 55.6% | 57.7 | 50.8 | 3569.0 | 3033.65 (-15.0%) | 2026-11-05 |
-| 2 | MAERSK-B.CO | A.P. Møller - Mærsk B A/S | KØB | 47.5% | 50.1 | 68.7 | 20210.0 | 17178.5 (-15.0%) | 2026-11-05 |
-| 3 | SAP.DE | SAP SE                        I | KØB | 38.1% | 69.7 | 79.3 | 186.48 | 158.51 (-15.0%) | 2026-10-21 |
-| 4 | EQNR.OL | EQUINOR | KØB | 36.7% | 54.7 | 78.4 | 380.5 | 323.43 (-15.0%) | 2026-10-28 |
-| 5 | SHEL.L | SHELL PLC ORD EUR0.07 | KØB | 28.4% | 65.1 | 67.5 | 3561.5 | 3027.28 (-15.0%) | 2026-10-29 |
-| 6 | CVX | Chevron Corporation | HOLD | 27.4% | 72.9 | 68.7 | 207.4 | 176.29 (-15.0%) | 2027-01-29 |
-| 7 | MA | Mastercard Incorporated | HOLD | 26.9% | 73.4 | 47.9 | 636.82 | 541.3 (-15.0%) | 2027-01-28 |
-| 8 | MSFT | Microsoft Corporation | HOLD | 26.3% | 75.2 | 55.6 | 498.88 | 424.05 (-15.0%) | 2027-01-27 |
-| 9 | V | Visa Inc. | HOLD | 25.2% | 73.1 | 53.0 | 410.83 | 349.21 (-15.0%) | 2027-01-26 |
-| 10 | XOM | ExxonMobil Holdings Corporation | HOLD | 23.1% | 64.1 | 61.2 | 158.46 | 134.69 (-15.0%) | 2027-01-29 |
+| 1 | GMAB.CO | Genmab A/S | KØB | 73.9% | 62.5 | 48.8 | 3809.0 | 3237.65 (-15.0%) | 2027-02-16 |
+| 2 | MAERSK-B.CO | A.P. Møller - Mærsk B A/S | KØB | 50.5% | 50.2 | 70.3 | 18855.0 | 16026.75 (-15.0%) | 2027-02-11 |
+| 3 | MSFT | Microsoft Corporation | KØB | 29.3% | 75.4 | 55.8 | 496.41 | 421.95 (-15.0%) | 2027-01-27 |
+| 4 | EQNR.OL | EQUINOR | KØB | 29.0% | 54.7 | 78.4 | 380.6 | 323.51 (-15.0%) | 2027-02-02 |
+| 5 | CVX | Chevron Corporation | KØB | 28.3% | 72.9 | 68.3 | 209.99 | 178.49 (-15.0%) | 2027-01-29 |
+| 6 | SHEL.L | SHELL PLC ORD EUR0.07 | HOLD | 28.3% | 65.2 | 67.6 | 3543.0 | 3011.55 (-15.0%) | 2027-02-04 |
+| 7 | SAP.DE | SAP SE                        I | HOLD | 26.4% | 69.7 | 78.9 | 189.28 | 160.89 (-15.0%) | 2027-01-28 |
+| 8 | XOM | ExxonMobil Holdings Corporation | HOLD | 25.6% | 64.1 | 61.2 | 158.93 | 135.09 (-15.0%) | 2027-01-29 |
+| 9 | MA | Mastercard Incorporated | HOLD | 24.3% | 78.2 | 47.6 | 644.14 | 547.52 (-15.0%) | 2027-01-28 |
+| 10 | V | Visa Inc. | HOLD | 23.6% | 73.1 | 52.7 | 414.74 | 352.53 (-15.0%) | 2027-01-26 |
 
 Research-værktøj, ikke finansiel rådgivning.
