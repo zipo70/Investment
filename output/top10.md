@@ -1,20 +1,20 @@
-# Top 10 — 2026-11-24 16:24 UTC
+# Top 10 — 2026-11-25 16:02 UTC
 
-Univers: 79 · data-fejl: 1 · uden optrend: 37 · shortlist: 10
+Univers: 79 · data-fejl: 1 · uden optrend: 38 · shortlist: 10
 
 Model A · næste rebalancering: 2027-01-21 · i dag rebalanceringsdag: False
 
 | # | Ticker | Navn | Model A | Momentum 6-1 | Komposit (info) | GEICO | Kurs | Stop −15 % | Regnskab |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | GMAB.CO | Genmab A/S | KØB | 73.9% | 62.5 | 48.8 | 3809.0 | 3237.65 (-15.0%) | 2027-02-16 |
-| 2 | MAERSK-B.CO | A.P. Møller - Mærsk B A/S | KØB | 50.5% | 50.2 | 70.3 | 18855.0 | 16026.75 (-15.0%) | 2027-02-11 |
-| 3 | MSFT | Microsoft Corporation | KØB | 29.3% | 75.4 | 55.8 | 496.41 | 421.95 (-15.0%) | 2027-01-27 |
-| 4 | EQNR.OL | EQUINOR | KØB | 29.0% | 54.7 | 78.4 | 380.6 | 323.51 (-15.0%) | 2027-02-02 |
-| 5 | CVX | Chevron Corporation | KØB | 28.3% | 72.9 | 68.3 | 209.99 | 178.49 (-15.0%) | 2027-01-29 |
-| 6 | SHEL.L | SHELL PLC ORD EUR0.07 | HOLD | 28.3% | 65.2 | 67.6 | 3543.0 | 3011.55 (-15.0%) | 2027-02-04 |
-| 7 | SAP.DE | SAP SE                        I | HOLD | 26.4% | 69.7 | 78.9 | 189.28 | 160.89 (-15.0%) | 2027-01-28 |
-| 8 | XOM | ExxonMobil Holdings Corporation | HOLD | 25.6% | 64.1 | 61.2 | 158.93 | 135.09 (-15.0%) | 2027-01-29 |
-| 9 | MA | Mastercard Incorporated | HOLD | 24.3% | 78.2 | 47.6 | 644.14 | 547.52 (-15.0%) | 2027-01-28 |
-| 10 | V | Visa Inc. | HOLD | 23.6% | 73.1 | 52.7 | 414.74 | 352.53 (-15.0%) | 2027-01-26 |
+| 1 | GMAB.CO | Genmab A/S | KØB | 82.9% | 62.5 | 49.1 | 3771.0 | 3205.35 (-15.0%) | 2027-02-10 |
+| 2 | MAERSK-B.CO | A.P. Møller - Mærsk B A/S | KØB | 43.4% | 50.5 | 70.1 | 18995.0 | 16145.75 (-15.0%) | 2027-02-11 |
+| 3 | SAP.DE | SAP SE                        I | KØB | 30.9% | 68.6 | 78.9 | 189.82 | 161.35 (-15.0%) | 2027-01-28 |
+| 4 | EQNR.OL | EQUINOR | KØB | 26.9% | 54.7 | 78.2 | 384.6 | 326.91 (-15.0%) | 2027-02-02 |
+| 5 | CVX | Chevron Corporation | KØB | 25.8% | 72.9 | 68.3 | 210.07 | 178.56 (-15.0%) | 2027-01-29 |
+| 6 | COLO-B.CO | Coloplast B A/S | HOLD | 25.0% | 55.6 | 73.4 | 507.0 | 430.95 (-15.0%) | 2027-02-09 |
+| 7 | MSFT | Microsoft Corporation | HOLD | 24.7% | 75.4 | 56.6 | 478.96 | 407.12 (-15.0%) | 2027-01-27 |
+| 8 | MA | Mastercard Incorporated | HOLD | 23.9% | 75.9 | 47.4 | 648.16 | 550.94 (-15.0%) | 2027-01-28 |
+| 9 | V | Visa Inc. | HOLD | 23.9% | 77.9 | 52.6 | 417.15 | 354.58 (-15.0%) | 2027-01-26 |
+| 10 | XOM | ExxonMobil Holdings Corporation | HOLD | 23.2% | 64.3 | 61.2 | 158.91 | 135.08 (-15.0%) | 2027-01-29 |
 
 Research-værktøj, ikke finansiel rådgivning.
